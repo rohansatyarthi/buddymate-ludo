@@ -43,7 +43,7 @@ app.use(sessionMiddleware);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(publicPath));
 
-// Room management
+// Room management: Map<roomCode, { players: Map<sessionId, { id: number, socketId: string }>, idCounter: number, gameState: { positions: {}, chance: number, win: {} } }>
 const rooms = new Map();
 
 function generateRoomCode() {
@@ -72,12 +72,18 @@ app.post('/', (req, res) => {
     while (rooms.has(roomCode)) {
       roomCode = generateRoomCode();
     }
-    rooms.set(roomCode, { players: new Map(), idCounter: 0 });
+    rooms.set(roomCode, {
+      players: new Map(),
+      idCounter: 0,
+      gameState: { positions: {}, chance: -1, win: {} }
+    });
     const playerId = 0;
     req.session.roomCode = roomCode;
     req.session.playerId = playerId;
     req.session.sessionId = req.sessionID;
     rooms.get(roomCode).players.set(req.sessionID, { id: playerId, socketId: null });
+    rooms.get(roomCode).gameState.positions[playerId] = {};
+    rooms.get(roomCode).gameState.win[playerId] = 0;
     console.log(`Created room ${roomCode} with player ID ${playerId}, session ${req.sessionID}`);
     res.redirect(`/${roomCode}`);
   } else if (action === 'join' && roomCode && rooms.has(roomCode)) {
@@ -89,6 +95,8 @@ app.post('/', (req, res) => {
       req.session.roomCode = roomCode;
       req.session.playerId = playerId;
       req.session.sessionId = req.sessionID;
+      rooms.get(roomCode).gameState.positions[playerId] = {};
+      rooms.get(roomCode).gameState.win[playerId] = 0;
       console.log(`Player ID ${playerId} joined room ${roomCode}, session ${req.sessionID}`);
       res.redirect(`/${roomCode}`);
     } else {
@@ -148,6 +156,24 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('sync-state', ({ room, positions, chance, win }, callback) => {
+    if (room === roomCode) {
+      const roomData = rooms.get(roomCode);
+      if (positions) {
+        roomData.gameState.positions = { ...roomData.gameState.positions, ...positions };
+      }
+      if (chance !== undefined) {
+        roomData.gameState.chance = Number(chance);
+      }
+      if (win) {
+        roomData.gameState.win = { ...roomData.gameState.win, ...win };
+      }
+      console.log(`Sync-state for room ${roomCode}: positions=${JSON.stringify(roomData.gameState.positions)}, chance=${roomData.gameState.chance}, win=${JSON.stringify(roomData.gameState.win)}`);
+      callback(roomData.gameState);
+      io.to(roomCode).emit('state-updated', roomData.gameState);
+    }
+  });
+
   socket.on('roll-dice', ({ room, id }, callback) => {
     if (room === roomCode && id === playerId) {
       const num = Math.floor(Math.random() * 6) + 1;
@@ -167,6 +193,7 @@ io.on('connection', (socket) => {
 
   socket.on('chance', ({ room, nxt_id }) => {
     if (room === roomCode) {
+      rooms.get(roomCode).gameState.chance = Number(nxt_id);
       io.to(roomCode).emit('is-it-your-chance', nxt_id);
       console.log(`Chance passed to player ${nxt_id} in room ${roomCode}`);
     }
@@ -174,6 +201,7 @@ io.on('connection', (socket) => {
 
   socket.on('WON', ({ room, id, player }) => {
     if (room === roomCode && id === playerId) {
+      rooms.get(roomCode).gameState.win[id] = (rooms.get(roomCode).gameState.win[id] || 0) + 1;
       io.to(roomCode).emit('winner', id);
       console.log(`Player ${playerId} won in room ${roomCode}`);
     }
@@ -208,6 +236,9 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Send initial game state on connect
+  const roomData = rooms.get(roomCode);
+  socket.emit('state-updated', roomData.gameState);
   io.to(roomCode).emit('new-user-joined', { id: playerId });
 });
 

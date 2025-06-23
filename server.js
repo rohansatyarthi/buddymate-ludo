@@ -9,19 +9,17 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   connectionStateRecovery: {
-    maxDisconnectionDuration: 5 * 60 * 1000, // 5 minutes for Render
+    maxDisconnectionDuration: 5 * 60 * 1000,
     skipMiddlewares: true
   }
 });
 const port = process.env.PORT || 3000;
 
-// Define paths
 const viewsPath = path.join(__dirname, 'views');
 const publicPath = path.join(__dirname, 'public');
 console.log(`Views directory path: ${viewsPath}`);
 console.log(`Public directory path: ${publicPath}`);
 
-// Check if directories exist
 if (!fs.existsSync(viewsPath)) {
   console.error(`Views directory not found at ${viewsPath}`);
 }
@@ -29,28 +27,24 @@ if (!fs.existsSync(publicPath)) {
   console.error(`Public directory not found at ${publicPath}`);
 }
 
-// Session middleware with hardcoded secret
 const sessionMiddleware = session({
   secret: 'buddymate-ludo-2025',
   resave: false,
   saveUninitialized: false,
   store: new (require('express-session').MemoryStore)(),
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 1 day
+  cookie: { maxAge: 24 * 60 * 60 * 1000 }
 });
 
-// Use session middleware for Express
 app.use(sessionMiddleware);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(publicPath));
 
-// Room management: Map<roomCode, { players: Map<sessionId, { id: number, socketId: string }>, idCounter: number, gameState: { positions: {}, chance: number, win: {} } }>
 const rooms = new Map();
 
 function generateRoomCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-// Serve index.html
 app.get('/', (req, res) => {
   const indexPath = path.join(viewsPath, 'index.html');
   if (fs.existsSync(indexPath)) {
@@ -62,7 +56,6 @@ app.get('/', (req, res) => {
   }
 });
 
-// Handle room creation/joining
 app.post('/', (req, res) => {
   const action = req.body.action_to_do;
   let roomCode = req.body.roomcode?.toUpperCase();
@@ -107,7 +100,6 @@ app.post('/', (req, res) => {
   }
 });
 
-// Serve ludo.html for room URLs
 app.get('/:roomCode', (req, res) => {
   const roomCode = req.params.roomCode.toUpperCase();
   if (rooms.has(roomCode)) {
@@ -124,12 +116,10 @@ app.get('/:roomCode', (req, res) => {
   }
 });
 
-// Share session with Socket.IO
 io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next);
 });
 
-// Socket.IO events
 io.on('connection', (socket) => {
   const session = socket.request.session;
   const roomCode = session.roomCode;
@@ -159,16 +149,30 @@ io.on('connection', (socket) => {
   socket.on('sync-state', ({ room, positions, chance, win }, callback) => {
     if (room === roomCode) {
       const roomData = rooms.get(roomCode);
+      console.log(`Client sent state for ${room}: positions=${JSON.stringify(positions)}, chance=${chance}, win=${JSON.stringify(win)}`);
       if (positions) {
-        roomData.gameState.positions = { ...roomData.gameState.positions, ...positions };
+        for (let id in positions) {
+          if (!roomData.gameState.positions[id]) {
+            roomData.gameState.positions[id] = {};
+          }
+          for (let pid in positions[id]) {
+            roomData.gameState.positions[id][pid] = {
+              x: Number(positions[id][pid].x),
+              y: Number(positions[id][pid].y),
+              pos: Number(positions[id][pid].pos)
+            };
+          }
+        }
       }
-      if (chance !== undefined) {
+      if (chance !== undefined && chance !== null) {
         roomData.gameState.chance = Number(chance);
       }
       if (win) {
-        roomData.gameState.win = { ...roomData.gameState.win, ...win };
+        for (let id in win) {
+          roomData.gameState.win[id] = Number(win[id]);
+        }
       }
-      console.log(`Sync-state for room ${roomCode}: positions=${JSON.stringify(roomData.gameState.positions)}, chance=${roomData.gameState.chance}, win=${JSON.stringify(roomData.gameState.win)}`);
+      console.log(`Updated state for room ${roomCode}: ${JSON.stringify(roomData.gameState)}`);
       callback(roomData.gameState);
       io.to(roomCode).emit('state-updated', roomData.gameState);
     }
@@ -236,8 +240,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Send initial game state on connect
   const roomData = rooms.get(roomCode);
+  console.log(`Sending initial state to ${socket.id}: ${JSON.stringify(roomData.gameState)}`);
   socket.emit('state-updated', roomData.gameState);
   io.to(roomCode).emit('new-user-joined', { id: playerId });
 });

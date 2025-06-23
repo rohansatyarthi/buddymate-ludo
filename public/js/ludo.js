@@ -216,15 +216,19 @@ socket.on('connect', function() {
                 console.log('Sending new room code to Android:', newRoomCode);
                 window.Android.sendRoomCode(newRoomCode);
             }
-            // Retry with new room code via fetch
-            socket.emit('fetch', newRoomCode, function(newData, newId, newError) {
-                if (newError || newData === null || newId === null) {
-                    console.error('Retry failed:', newError, newData, newId);
-                    outputMessage({ msg: 'Error: Unable to create room. Please try again.' }, 5);
-                    return;
-                }
-                window.location.href = `/ludo/${newRoomCode}`;
-            });
+            // Clear localStorage to reset room state
+            window.localStorage.clear();
+            // Delay retry to avoid server overload
+            setTimeout(() => {
+                socket.emit('fetch', newRoomCode, function(newData, newId, newError) {
+                    if (newError || newData === null || newId === null) {
+                        console.error('Retry failed:', newError, newData, newId);
+                        outputMessage({ msg: 'Error: Unable to create room. Please try again.' }, 5);
+                        return;
+                    }
+                    window.location.href = `/ludo/${newRoomCode}`;
+                });
+            }, 1000); // 1s delay
             return;
         }
         MYROOM = data ? data.sort((a, b) => a - b).map(Number) : [0];
@@ -265,14 +269,19 @@ socket.on('connect', function() {
             console.log('Sending new room code to Android (imposter):', newRoomCode);
             window.Android.sendRoomCode(newRoomCode);
         }
-        socket.emit('fetch', newRoomCode, function(data, id, error) {
-            if (error || data === null || id === null) {
-                console.error('Imposter retry failed:', error, data, id);
-                outputMessage({ msg: 'Error: Unable to create room. Please try again.' }, 5);
-                return;
-            }
-            window.location.href = `/ludo/${newRoomCode}`;
-        });
+        // Clear localStorage to reset room state
+        window.localStorage.clear();
+        // Delay retry
+        setTimeout(() => {
+            socket.emit('fetch', newRoomCode, function(data, id, error) {
+                if (error || data === null || id === null) {
+                    console.error('Imposter retry failed:', error, data, id);
+                    outputMessage({ msg: 'Error: Unable to create room. Please try again.' }, 5);
+                    return;
+                }
+                window.location.href = `/ludo/${newRoomCode}`;
+            });
+        }, 1000);
     });
 
     socket.on('is-it-your-chance', function(data) {

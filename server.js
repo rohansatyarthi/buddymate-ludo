@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const session = require('express-session');
 const path = require('path');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -14,9 +15,23 @@ const io = new Server(server, {
 });
 const port = process.env.PORT || 3000;
 
+// Define paths
+const viewsPath = path.join(__dirname, 'views');
+const publicPath = path.join(__dirname, 'public');
+console.log(`Views directory path: ${viewsPath}`);
+console.log(`Public directory path: ${publicPath}`);
+
+// Check if directories exist
+if (!fs.existsSync(viewsPath)) {
+  console.error(`Views directory not found at ${viewsPath}`);
+}
+if (!fs.existsSync(publicPath)) {
+  console.error(`Public directory not found at ${publicPath}`);
+}
+
 // Session middleware with hardcoded secret
 const sessionMiddleware = session({
-  secret: 'buddymate-ludo-2025', // Hardcoded secret (secure for testing; consider stronger for production)
+  secret: 'buddymate-ludo-2025',
   resave: false,
   saveUninitialized: false,
   store: new (require('express-session').MemoryStore)(),
@@ -26,24 +41,25 @@ const sessionMiddleware = session({
 // Use session middleware for Express
 app.use(sessionMiddleware);
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(publicPath));
 
-// Share session with Socket.IO
-io.use((socket, next) => {
-  sessionMiddleware(socket.request, {}, next);
-});
-
-// Room management: Map<roomCode, { players: Map<sessionId, { id: number, socketId: string }>, idCounter: number }>
+// Room management
 const rooms = new Map();
 
-// Generate room code
 function generateRoomCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
 // Serve index.html
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  const indexPath = path.join(viewsPath, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    console.log(`Serving index.html from ${indexPath}`);
+    res.sendFile(indexPath);
+  } else {
+    console.error(`index.html not found at ${indexPath}`);
+    res.status(404).send('Error: index.html not found');
+  }
 });
 
 // Handle room creation/joining
@@ -87,10 +103,22 @@ app.post('/', (req, res) => {
 app.get('/:roomCode', (req, res) => {
   const roomCode = req.params.roomCode.toUpperCase();
   if (rooms.has(roomCode)) {
-    res.sendFile(path.join(__dirname, 'public', 'ludo.html'));
+    const ludoPath = path.join(viewsPath, 'ludo.html');
+    if (fs.existsSync(ludoPath)) {
+      console.log(`Serving ludo.html from ${ludoPath}`);
+      res.sendFile(ludoPath);
+    } else {
+      console.error(`ludo.html not found at ${ludoPath}`);
+      res.status(404).send('Error: ludo.html not found');
+    }
   } else {
     res.redirect('/error-imposter');
   }
+});
+
+// Share session with Socket.IO
+io.use((socket, next) => {
+  sessionMiddleware(socket.request, {}, next);
 });
 
 // Socket.IO events

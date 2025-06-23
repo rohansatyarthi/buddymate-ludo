@@ -35,11 +35,11 @@ let homeTilePos = {
 class Player {
   constructor(id) {
     this.id = String(id);
-    this.myPieces = new Object();
+    this.myPieces = {};
     for (let i = 0; i < 4; i++) {
       this.myPieces[i] = new Piece(String(i), String(id));
     }
-    this.won = parseInt(0);
+    this.won = 0;
   }
   draw() {
     for (let i = 0; i < 4; i++) {
@@ -47,11 +47,7 @@ class Player {
     }
   }
   didIwin() {
-    if (this.won == 4) {
-      return 1;
-    } else {
-      return 0;
-    }
+    return this.won === 4 ? 1 : 0;
   }
 }
 
@@ -59,7 +55,6 @@ class Piece {
   constructor(i, id) {
     this.path = [];
     this.color_id = String(id);
-    console.log(this.color_id, typeof(this.color_id));
     this.Pid = String(i);
     this.pos = -1;
     this.x = parseInt(allPiecesePos[this.color_id][this.Pid].x);
@@ -67,7 +62,6 @@ class Piece {
     this.image = PIECES[this.color_id];
     switch (id) {
       case '0':
-        console.log('switch is working');
         for (let i = 0; i < 4; i++) { this.path.push(this.oneStepToRight); }
         this.path.push(this.oneStepTowards45);
         for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToTop); }
@@ -151,16 +145,16 @@ class Piece {
   }
 
   update(num) {
-    if (this.pos != -1 && this.pos + num <= 56) {
+    if (this.pos !== -1 && this.pos + num <= 56) {
       for (let i = this.pos; i < this.pos + num; i++) {
         this.path[i](this.color_id, this.Pid);
         console.log('hemilo selmon');
       }
       this.pos += num;
-      if (this.pos == 56) {
+      if (this.pos === 56) {
         window.PLAYERS[this.color_id].won += 1;
       }
-    } else if (num == 6 && this.pos == -1) {
+    } else if (num === 6 && this.pos === -1) {
       this.x = homeTilePos[this.color_id][0].x;
       this.y = homeTilePos[this.color_id][0].y;
       this.pos = 0;
@@ -174,17 +168,17 @@ class Piece {
 
   oneStepToLeft(id, pid) {
     window.PLAYERS[id].myPieces[pid].x -= 50;
-    console.log('to l', this.x, this.y, typeof(this.x));
+    console.log('to l', this.x, this.y, typeof(this.x), typeof(this.y));
   }
 
   oneStepToTop(id, pid) {
     window.PLAYERS[id].myPieces[pid].y -= 50;
-    console.log('to t', this.x, this.y, typeof(this.y));
+    console.log('to t', this.x, this.y, typeof(this.x), typeof(this.y));
   }
 
   oneStepToBottom(id, pid) {
     window.PLAYERS[id].myPieces[pid].y += 50;
-    console.log('to b', this.x, this.y, typeof(this.y));
+    console.log('to b', this.x, this.y, typeof(this.x), typeof(this.y));
   }
 
   oneStepTowards45(id, pid) {
@@ -219,9 +213,9 @@ class Piece {
 }
 
 socket.on('connect', function() {
-  console.log(`Connected with ID: ${socket.id}, myid: ${myid}`);
+  console.log(`Connected with socket ID: ${socket.id}, myid: ${myid}`);
   socket.emit('fetch', room_code, function(data, id) {
-    console.log(`Fetched room ${room_code}: ${mydata}, myid: ${id}`);
+    console.log(`Fetched room ${room_code}: ${data}, myid: ${id}`);
     MYROOM = data.sort((a, b) => a - b);
     for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i]; }
     myid = id;
@@ -237,75 +231,78 @@ socket.on('connect', function() {
       diceAction();
     });
   }
+});
 
-  socket.on('imposter', () => { window.location.replace('/error-imposter'); });
+socket.on('imposter', () => { window.location.replace('/error-imposter'); });
 
-  socket.on('is-it-your-chance', function(data) {
-    if (data === myid) {
-      styleButton(1);
-      outputMessage({ Name: 'your', id: 'data' }, 4);
-    } else {
-      outputMessage({ Name: USERNAMES[data] + "'s", id: data }, 4);
-    }
-    chance = Number(data);
-    window.localStorage.setItem('chance', chance.toString());
-  });
+socket.on('is-it-your-chance', function(data) {
+  if (data === myid) {
+    styleButton(1);
+    outputMessage({ Name: 'your', id: data }, 4);
+  } else {
+    outputMessage({ Name: USERNAMES[data] + "'s", id: data }, 4);
+  }
+  chance = Number(data);
+  window.localStorage.setItem('chance', chance.toString());
+});
 
-  socket.on('new-user-joined', function(data) {
-    MYROOM.push(data.id);
-    MYROOM = [...(new Set(MYROOM))];
-    MYROOM.sort((a, b) => a - b);
-    for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i]; }
-    loadNewPiece(data.id);
-    outputMessage({ Name: USERNAMES[data.id], id: data.id }, 0);
-    document.getElementById("myModal-2").style.display = "none";
-    let butt = document.getElementById('WAIT');
-    butt.disabled = false;
-    butt.style.opacity = 1;
-    butt.style.cursor = "pointer";
-    clearInterval(window.timer);
-  });
+socket.on('new-user-joined', function(data) {
+  MYROOM.push(data.id);
+  MYROOM = [...new Set(MYROOM)].sort((a, b) => a - b);
+  for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i]; }
+  loadNewPiece(data.id);
+  outputMessage({ Name: USERNAMES[data.id], id: data.id }, 0);
+  document.getElementById("myModal-2").style.display = "none";
+  let butt = document.getElementById('WAIT');
+  butt.disabled = false;
+  butt.style.opacity = 1;
+  butt.style.cursor = "pointer";
+  clearInterval(window.timer);
+});
 
-  socket.on('user-disconnected', function(data) {
-    outputMessage({ Name: dataUSRNAMES[id]}, 6);
-    resumeHandler(data);
-  });
+socket.on('user-disconnected', function(data) {
+  outputMessage({ Name: USERNAMES[data], id: data }, 6);
+  resumeHandler(data);
+});
 
-  socket.on('resume', function(data) {
-    resume(data.id);
-    data.id == data.click ? outputMessage({ id: data.id, msg: `Resumed the game without ${USERNAMES[data.id]}` }, 5) : outputMessage({ id: data.click, msg: `${USERNAMES[data.click]} has resumed the game without ${USERNAMES[data.id]}` }, 5);
-  });
+socket.on('resume', function(data) {
+  resume(data.id);
+  data.id === data.click
+    ? outputMessage({ id: data.id, msg: `Resumed the game without ${USERNAMES[data.id]}` }, 5)
+    : outputMessage({ id: data.click, msg: `${USERNAMES[data.click]} has resumed the game without ${USERNAMES[data.id]}` }, 5);
+});
 
-  socket.on('wait', function(data) {
-    wait();
-    outputMessage({ id: data.click, msg: `${USERNAMES[data.click]} has decided to wait` }, 5);
-  });
+socket.on('wait', function(data) {
+  wait();
+  outputMessage({ id: data.click, msg: `${USERNAMES[data.click]} has decided to wait` }, 5);
+});
 
-  socket.on('rolled-dice', function(data) {
-    Number(data.id) != myid ? outputMessage({ Name: USERNAMES[data.id], Num: data.num, id: data.id }, 1) : outputMessage({ Name: 'you', Num: data.num, id: data.id }, 1);
-  });
+socket.on('rolled-dice', function(data) {
+  Number(data.id) !== myid
+    ? outputMessage({ Name: USERNAMES[data.id], Num: data.num, id: data.id }, 1)
+    : outputMessage({ Name: 'you', Num: data.num, id: data.id }, 1);
+});
 
-  socket.on('Thrown-dice', async function(data) {
-    console.log(data);
-    await PLAYERS[data.id].myPieces[data.pid].update(data.num);
-    if (iKill(data.id, data.pid)) {
-      outputMessage({ msg: 'Oops got killed', id: data.id }, 5);
-      allPlayerHandler();
-    } else {
-      allPlayerHandler();
-    }
-    if (PLAYERS[data.id].didIwin()) {
-      socket.emit('WON', {
-        room: data.room,
-        id: data.id,
-        player: myid
-      });
-    }
-  });
+socket.on('Thrown-dice', async function(data) {
+  console.log('Thrown-dice:', data);
+  await PLAYERS[data.id].myPieces[data.pid].update(data.num);
+  if (iKill(data.id, data.pid)) {
+    outputMessage({ msg: 'Oops got killed', id: data.id }, 5);
+    allPlayerHandler();
+  } else {
+    allPlayerHandler();
+  }
+  if (PLAYERS[data.id].didIwin()) {
+    socket.emit('WON', {
+      room: data.room,
+      id: data.id,
+      player: myid
+    });
+  }
+});
 
-  socket.on('winner', function(data) {
-    showModal(data);
-  });
+socket.on('winner', function(data) {
+  showModal(data);
 });
 
 socket.on('disconnect', function() {
@@ -314,12 +311,12 @@ socket.on('disconnect', function() {
 
 function outputMessage(anObject, k) {
   let msgBoard = document.querySelector('.msgBoard');
-  if (k === 1 && !(anObject.Name.includes('<') || anObject.Name.includes('>') || anObject.Name.includes('/'))) {
+  if (k === 1 && !/[<>\\/]/.test(anObject.Name)) {
     const div = document.createElement('div');
     div.classList.add('message');
     div.innerHTML = `<p><strong>★ <span id="color-message-span1" style="text-shadow: 0 0 4px ${colors[anObject.id]};">${anObject.Name}</span></strong><span id="color-message-span2"> got a ${anObject.Num}</span></p>`;
     msgBoard.appendChild(div);
-  } else if (k === 0 && !(anObject.Name.includes('<') || anObject.Name.includes('>') || anObject.Name.includes('/'))) {
+  } else if (k === 0 && !/[<>\\/]/.test(anObject.Name)) {
     const div = document.createElement('div');
     div.classList.add('messageFromServer');
     div.innerHTML = `<p>↝ <span id="color-message-span1" style="text-shadow: 0 0 4px ${colors[anObject.id]};">${anObject.Name}</span><span id="color-message-span2"> entered the game</span></p>`;
@@ -327,7 +324,7 @@ function outputMessage(anObject, k) {
   } else if (k === 3) {
     const div = document.createElement('div');
     div.classList.add('messageFromServer');
-    div.innerHTML = `<span id="color-message-span2" style="text-shadow: 0 0 0 4px ${colors[myid]};">${anObject}!!</span>`;
+    div.innerHTML = `<span id="color-message-span2" style="text-shadow: 0 0 4px ${colors[myid]};">${anObject}!!</span>`;
     msgBoard.appendChild(div);
   } else if (k === 4) {
     const div = document.createElement('div');
@@ -364,297 +361,310 @@ function styleButton(k) {
 }
 
 function diceAction() {
-    let socketId = parseInt(socket.id);
-    let myId = parseInt(id);
-    socket.emit('roll-dice', { room: room_code, id: myid, }, function(num) {
-        console.log('19/6/21 dice rolled, got', num);
-        let spirit = new [];
-        for (let i = parseInt(0); i < 4; i++) {
-            if (myid == parseInt(myId)) {
-                if (PLAYERS[myid].myPieces[i].pos > parseInt(1) && (myPieces[i].pos + parseInt(num) <= parseInt(56)) {
-                    spirit.push(i);
-                }
-            }
-        if (spirit.length !== parseInt(0) || num == parseInt(6')) {
-            outputMessage('Click on a piece', 3);
-            canvas.addEventListener('click', function(event) clickHandler(e) {
-                console.log('19/6/21 click event listener added to canvas element');
-                let Xp = parseInt(e.clientX - e.target.getBoundingClientRect().left());
-                let Yp = parseInt(e.clientY - e.target.getBoundingClientRect().top());
-                let playerObj = {
-                    room: room_code,
-                    id: myid,
-                    num: num
-                };
-                let alert1 = boolean(true);
+  socket.emit('roll-dice', { room: room_code, id: myid }, function(num) {
+    console.log('19/6/21 dice rolled, got', num);
+    let spirit = [];
+    for (let i = 0; i < 4; i++) {
+      if (PLAYERS[myid].myPieces[i].pos > -1 && PLAYERS[myid].myPieces[i].pos + num <= 56) {
+        spirit.push(i);
+      }
+    }
+    if (spirit.length !== 0 || num === 6) {
+      outputMessage('Click on a piece', 3);
+      canvas.addEventListener('click', function clickHandler(e) {
+        console.log('19/6/21 click event listener added to canvas element');
+        let Xp = e.clientX - e.target.getBoundingClientRect().left;
+        let Yp = e.clientY - e.target.getBoundingClientRect().top;
+        let playerObj = {
+          room: room_code,
+          id: myid,
+          num: num
+        };
+        let alert1 = true;
 
-                for(let i = parseInt(0); i < parseInt(4); i++) {
-                    if (Xp - PLAYERS[myid].myPieces[i].x < parseInt(45)) && (Xp - PLAYERS[myid].myPieces[i].x] > parseInt(0) && (Yp - PLAYERS[myid].myPieces[i].y < parseInt(45)) && (Yp - PLAYERS[myid].myPieces[i].y > parseInt(0)) {
-                        console.log(i,' 'okokokok');
-                        if ((spirit.includes(i) || parseInt(num) === parseInt(6)) && PLAYERS[myid].myPieces[i].pos + parseInt(num) <= parseInt(56)) {
-                            console.log(playerObj.id);
-                            let playerObj['pid'] = i;
-                            socket.emit('random', id, function(data) {
-                                styleButton(0);
-                                console.log('random acknowledged');
-                                socket.emit('chance', { room: room_code, nxt_id: chanceRotation(myid, data)});
-                            });
-                            canvas.removeEventListener('click', clickHandler);
-                            return parseInt(0);
-                        } else {
-                            alert('Please click on Mim a valid Piece.');
-                            alert1 = boolean(false);
-                            break;
-                        }
-                    }
-                }
-                if (alert1) { alert('You need to click on a piece of your color'); }
-            });
-        } else {
-            socket.emit('chance', { room: room_code, nxt_id: chanceRotation(myid, num)});
-            console.log('19/6/21 next chance');
+        for (let i = 0; i < 4; i++) {
+          if (
+            Xp - PLAYERS[myid].myPieces[i].x < 45 &&
+            Xp - PLAYERS[myid].myPieces[i].x > 0 &&
+            Yp - PLAYERS[myid].myPieces[i].y < 45 &&
+            Yp - PLAYERS[myid].myPieces[i].y > 0
+          ) {
+            console.log(i, 'okokokok');
+            if ((spirit.includes(i) || num === 6) && PLAYERS[myid].myPieces[i].pos + num <= 56) {
+              playerObj.pid = i;
+              socket.emit('random', playerObj, function(data) {
+                styleButton(0);
+                console.log('random acknowledged');
+                socket.emit('chance', { room: room_code, nxt_id: chanceRotation(myid, data) });
+              });
+              canvas.removeEventListener('click', clickHandler);
+              return 0;
+            } else {
+              alert('Please click on a valid Piece.');
+              alert1 = false;
+              break;
+            }
+          }
         }
-    });
+        if (alert1) { alert('You need to click on a piece of your color'); }
+      });
+    } else {
+      socket.emit('chance', { room: room_code, nxt_id: chanceRotation(myid, num) });
+      console.log('19/6/21 next chance');
+    }
+  });
 }
 
 function StartTheGame() {
-    MYROOM.forEach((numb) => {
-        numb == myid ? outputMessage({ 'Name': 'You', id: numb }, 0) : outputMessage({ 'Name': USERNAMES[numb], id: numb }, 0);
-    });
-    document.getElementById("my-name").innerHTML += USERNAMES[myid]; console.log(myid);
-    let copyText = `\n\nMy room:\n${window.location.href} \n or join the room via\nMy room code:${room_code}`;
-    document.getElementById('copy').innerHTML += copyText;
-    if (MYROOM.length === parseInt(1)) {
-        styleButton(1);
-        chance = parseInt(myid);
-    } else {
-        styleButton(0);
-    }
-    loadAllPieces();
+  MYROOM.forEach((numb) => {
+    numb === myid
+      ? outputMessage({ Name: 'You', id: numb }, 0)
+      : outputMessage({ Name: USERNAMES[numb], id: numb }, 0);
+  });
+  document.getElementById('my-name').innerHTML += USERNAMES[myid];
+  console.log('myid:', myid);
+  let copyText = `\n\nMy room:\n${window.location.href} \nor join the room via\nMy room code:${room_code}`;
+  document.getElementById('copy').innerHTML += copyText;
+  if (MYROOM.length === 1) {
+    styleButton(1);
+    chance = Number(myid);
+  } else {
+    styleButton(0);
+  }
+  loadAllPieces();
 }
 
 function loadAllPieces() {
-    let cnt = parseInt(0);
-    for (let i = parseInt(0); i < colors.length; i++) {
-        let img = new Image();
-        img.src = new URL("../images/pieces/" + colors[i] + ".png");
-        img.onload = function() {
-            ++cnt;
-            if (cnt >= colors.length) {
-                for (let j = parseInt(0); j < MYROOM.length; j++) {
-                    PLAYERS[MYROOM[j]] = new Player(parseInt(MYROOM[j])));
-                }
-                if (window.localStorage.getItem('room') == room_code) {
-                    console.log('19/6/21 yes my localStorage is for this room');
-                    if (window.localStorage.getItem('started') == 'true') {
-                        console.log('19/6/21 yes i from this room');
-                        chance = parseInt(window.localStorage.getItem('chance'));
-                        let positions = JSON.parse(window.localStorage.getItem('positions'));
-                        let win = JSON.parse(window.localStorage.getItem('win'));
-                        for(let i = parseInt(0); i < MYROOM.length; i++) {
-                            PLAYERS[MYROOM[i]].win = parseInt(MYROOM[i]);
-                            for(let j = parseInt(0); j < parseInt(4); j++) {
-                                console.log('19/6/21 yes room==room_code && started==true:i,j:', i, j);
-                                PLAYERS[MYROOM[i]].myPieces[j].x = parseInt(positions[MYROOM[i]][j].x);
-                                PLAYERS[MYROOM[i]].myPieces[j].y = parseInt(positions[MYROOM[i]][j].y);
-                                PLAYERS[MYROOM[i]].myPieces[j].pos = parseInt(positions[MYROOM[i]][j].pos);
-                            }
-                        }
-                        allPlayerHandler();
-                    } else {
-                        allPlayerHandler();
-                    }
-                } else {
-                    window.localStorage.clear();
-                    window.localStorage.setItem('room', room_code);
-                    allPlayerHandler();
-                }
+  let cnt = 0;
+  for (let i = 0; i < colors.length; i++) {
+    let img = new Image();
+    img.src = "../images/pieces/" + colors[i] + ".png";
+    img.onload = () => {
+      ++cnt;
+      if (cnt >= colors.length) {
+        for (let j = 0; j < MYROOM.length; j++) {
+          PLAYERS[MYROOM[j]] = new Player(MYROOM[j]);
+        }
+        if (window.localStorage.getItem('room') === room_code) {
+          console.log('19/6/21 yes my localStorage is for this room');
+          if (window.localStorage.getItem('started') === 'true') {
+            console.log('19/6/21 yes i from this room');
+            chance = Number(window.localStorage.getItem('chance'));
+            let positions = JSON.parse(window.localStorage.getItem('positions'));
+            let win = JSON.parse(window.localStorage.getItem('win'));
+            for (let i = 0; i < MYROOM.length; i++) {
+              PLAYERS[MYROOM[i]].won = Number(win[MYROOM[i]]);
+              for (let j = 0; j < 4; j++) {
+                console.log('19/6/21 yes room==room_code && started==true:i,j:', i, j);
+                PLAYERS[MYROOM[i]].myPieces[j].x = Number(positions[MYROOM[i]][j].x);
+                PLAYERS[MYROOM[i]].myPieces[j].y = Number(positions[MYROOM[i]][j].y);
+                PLAYERS[MYROOM[i]].myPieces[j].pos = Number(positions[MYROOM[i]][j].pos);
+              }
             }
-        };
-        PIECES.push(img);
-    }
+            allPlayerHandler();
+          } else {
+            allPlayerHandler();
+          }
+        } else {
+          window.localStorage.clear();
+          window.localStorage.setItem('room', room_code);
+          allPlayerHandler();
+        }
+      }
+    };
+    PIECES.push(img);
+  }
 }
 
 function chanceRotation(id, num) {
-    if (num == parseInt(6)) {
-        console.log('19/6/21 nxt 0 chance(num==6)', id);
-        return id;
+  if (num === 6) {
+    console.log('19/6/21 nxt 0 chance(num==6)', id);
+    return id;
+  } else {
+    let c = MYROOM[chance + 1];
+    if (c) {
+      console.log('19/6/21 nxt 1 chance(MYROOM[chance+1])', c, '\nMYROOM', MYROOM, '\nPrevious chance', chance);
+      return c;
     } else {
-        let c = MYROOM[chance + parseInt(1)];
-        if (c) {
-            console.log('19/6/21 nxt 1 chance(MYROOM[chance+1])', c, '\nMYROOM', MYROOM, '\nPrevious chance', chance);
-            return c;
-        } else {
-            console.log('19/6/21 nxt 2 chance(MYROOM[0])', MYROOM[0], '\nMYROOM', MYROOM, '\nPrevious chance', chance, 'c:', c, 'chance+1', chance + parseInt(1), 'MYROOM[chance+1]', MYROOM[chance + parseInt(1)]);
-            return MYROOM[0];
-        }
+      console.log('19/6/21 nxt 2 chance(MYROOM[0])', MYROOM[0], '\nMYROOM', MYROOM, '\nPrevious chance', chance);
+      return MYROOM[0];
     }
+  }
 }
 
 function allPlayerHandler() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let i = parseInt(0); i < Object.keys(PLAYERS).length; i++) {
-        PLAYERS[MYROOM[i]].draw();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < Object.keys(PLAYERS).length; i++) {
+    PLAYERS[MYROOM[i]].draw();
+  }
+  let positions = {};
+  let win = {};
+  for (let i = 0; i < MYROOM.length; i++) {
+    positions[MYROOM[i]] = {};
+    win[MYROOM[i]] = PLAYERS[MYROOM[i]].won;
+    for (let j = 0; j < 4; j++) {
+      positions[MYROOM[i]][j] = {
+        x: PLAYERS[MYROOM[i]].myPieces[j].x,
+        y: PLAYERS[MYROOM[i]].myPieces[j].y,
+        pos: PLAYERS[MYROOM[i]].myPieces[j].pos
+      };
     }
-    let positions = {};
-    let win = {};
-    for (let i = parseInt(0); i < MYROOM.length; i++) {
-        positions[MYROOM[i]] = {};
-        win[MYROOM[i]] = PLAYERS[MYROOM[i]].win;
-        for (let j = parseInt(0); j < parseInt(4); j++) {
-            positions[MYROOM[i]][j] = {
-                x: PLAYERS[MYROOM[i]].myPieces[j].x,
-                y: PLAYERS[MYROOM[i]].myPieces[j].y,
-                pos: PLAYERS[MYROOM[i]].myPieces[j].pos
-            };
-        }
-    }
-    window.localStorage.setItem('started', 'true');
-    window.localStorage.setItem('chance', chance.toString());
-    window.localStorage.setItem('positions', JSON.stringify(positions));
-    window.localStorage.setItem('win', JSON.stringify(win));
+  }
+  window.localStorage.setItem('started', 'true');
+  window.localStorage.setItem('chance', chance.toString());
+  window.localStorage.setItem('positions', JSON.stringify(positions));
+  window.localStorage.setItem('win', JSON.stringify(win));
 }
 
 function loadNewPiece(id) {
-    PLAYERS[id] = new Player(parseInt(id));
-    if (window.localStorage.getItem('room') == room_code) {
-        console.log('19/6/21 yes I\'m from our room');
-        if (window.localStorage.getItem('started')) {
-            console.log('19/6/21 yes i have already started the game');
-            let positions = JSON.parse(window.localStorage.getItem('positions'));
-            let win = JSON.parse(window.localStorage.getItem('win'));
-            if (positions[id]) {
-                console.log(`yes I have some data for user of id: ${id} in my local storage\nIt is ${positions[id]}`);
-                PLAYERS[id].win = parseInt(win[id]);
-                for (let j = parseInt(0); j < parseInt(4); j++) {
-                    console.log(`19/6/21 for ${id},${j}\n${Number(x: parseInt(positions[id][j].x)}\n${Number(y: parseInt(positions[id][j].y)}\n${Number(pos: parseInt(positions[id][j].pos)}`);
-                    PLAYERS[id].myPieces[j].x = parseInt(Number(positions[id][j].x));
-                    let PLAYERS[id].myPieces[j].y = parseInt(Number(positions[id][j].y));
-                    let PLAYERS[id].myPieces[j].pos = parseInt(Number(positions[id][j].pos));
-                }
-            }
+  PLAYERS[id] = new Player(id);
+  if (window.localStorage.getItem('room') === room_code) {
+    console.log('19/6/21 yes I\'m from our room');
+    if (window.localStorage.getItem('started')) {
+      console.log('19/6/21 yes i have already started the game');
+      let positions = JSON.parse(window.localStorage.getItem('positions'));
+      let win = JSON.parse(window.localStorage.getItem('win'));
+      if (positions[id]) {
+        console.log(`yes I have some data for user of id: ${id} in my local storage\nIt is ${JSON.stringify(positions[id])}`);
+        PLAYERS[id].won = Number(win[id]);
+        for (let j = 0; j < 4; j++) {
+          console.log(`19/6/21 for ${id},${j}\nx:${positions[id][j].x}\ny:${positions[id][j].y}\npos:${positions[id][j].pos}`);
+          PLAYERS[id].myPieces[j].x = Number(positions[id][j].x);
+          PLAYERS[id].myPieces[j].y = Number(positions[id][j].y);
+          PLAYERS[id].myPieces[j].pos = Number(positions[id][j].pos);
         }
+      }
     }
-    allPlayerHandler();
+  }
+  allPlayerHandler();
 }
 
 function iKill(id, pid) {
-    let boss = PLAYERS[id].myPieces[pid];
-    for (let i = parseInt(0); i < MYROOM.length;i++) {
-        for (let j = parseInt(0); j < parseInt(4); j++) {
-            if (MYROOM[i] != id && parseInt(MYROOM_ID && boss && boss.x == id) && id == parseInt(id[MYROOM[i]].myPieces[j].x) && boss.y == id && parseInt(id == PLAYERS[MYROOM[i]].myPieces[j].y)) {
-                if (!inAhomeTile(id, pid))) {
-                    PLAYERS[id].parseInt(MYROOM[i]).myPieces[j].id](id);
-                    return parseInt(1);
-                }
-            }
+  let boss = PLAYERS[id].myPieces[pid];
+  for (let i = 0; i < MYROOM.length; i++) {
+    for (let j = 0; j < 4; j++) {
+      if (
+        MYROOM[i] !== id &&
+        boss.x === PLAYERS[MYROOM[i]].myPieces[j].x &&
+        boss.y === PLAYERS[MYROOM[i]].myPieces[j].y
+      ) {
+        if (!inAhomeTile(id, pid)) {
+          PLAYERS[MYROOM[i]].myPieces[j].kill();
+          return 1;
         }
+      }
     }
-    return parseInt(0);
+  }
+  return 0;
 }
 
 function inAhomeTile(id, pid) {
-    for (let i = parseInt(0); i < parseInt(4); i++) {
-        if ((PLAYERS[id].myPieces[pid].id == id && parseInt((PLAYERS[id])) && id === parseInt(id)).myPieces[pid].x == id && parseInt(id) && id == parseInt(id) && id == homeTile && myPieces[pid].x == parseInt(id) && parseInt(id) == parseInt(homeTile(id[i][0])).id].x) && (PLAYERS[id].myPieces[id].pid == id && parseInt((PLAYERS[id])).myPieces[pid].y == id && parseInt(id) && id == parseInt(id) && id == homeTile && myPieces[pid].y == id && parseInt(id) && parseInt(id) == parseInt(homeTile(id[i][0])).y)) || ((PLAYERS[id].myPieces[pid].id]).x == id && parseInt(id) && id == parseInt(id) && id == homeTile(id && parseInt(id)) && myPieces[pid]].x == id && parseInt(id) && parseInt(id) == parseInt(homeTile(id[i][1])).id].x)) && (PLAYERS[id].myPieces[id].pid].y == id && id && parseInt(id) && id == parseInt(id) && id == homeTile && myPieces[id].pid].y == id && parseInt(id) && parseInt(id) == parseInt(homeTile && parseInt(id[i][1])).y))) {
-            return boolean(true(parseInt(id)));
-        }
+  for (let i = 0; i < 4; i++) {
+    if (
+      (PLAYERS[id].myPieces[pid].x === homeTilePos[i][0].x &&
+       PLAYERS[id].myPieces[pid].y === homeTilePos[i][0].y) ||
+      (PLAYERS[id].myPieces[pid].x === homeTilePos[i][1].x &&
+       PLAYERS[id].myPieces[pid].y === homeTilePos[i][1].y)
+    ) {
+      return true;
     }
-    return false;
+  }
+  return false;
 }
 
 function showModal(id) {
-    window.localStorage.clear();
-    document.getElementById("myModal-1").style.display = "block";
-    document.getElementById("win-win").innerHTML = `The winner is ${USERNAMES[id]}`;
+  window.localStorage.clear();
+  document.getElementById("myModal-1").style.display = "block";
+  document.getElementById("win-win").innerHTML = `The winner is ${USERNAMES[id]}`;
 }
 
 async function copyhandler() {
-    var copyText = document.getElementById("copy").innerHTML;
-    await navigator.clipboard.writeText(copyText.toString());
-    var tooltipContent = document.getElementById("myTooltip");
-    tooltipContent.innerHTML = "Copied!!";
+  var copyText = document.getElementById("copy").innerHTML;
+  await navigator.clipboard.writeText(copyText);
+  var tooltip = document.getElementById("myTooltip");
+  tooltip.innerHTML = "Copied!!";
 }
 
 function outFunc() {
-    var tooltipContent = document.getElementById("myTooltip");
-    tooltipContent.innerHTML = "Copy to clipboard";
+  var tooltip = document.getElementById("myTooltip");
+  tooltip.innerHTML = "Copy to clipboard";
 }
 
 async function copyhandlerLink() {
-    var copyText = window.location.href;
-    await navigator.clipboard.writeText(copyText.toString());
-    var tooltipLink = document.getElementById("myTooltipLink");
-    tooltipLink.innerHTML = "Copied!!";
+  var copyText = window.location.href;
+  await navigator.clipboard.writeText(copyText);
+  var tooltip = document.getElementById("myTooltipLink");
+  tooltip.innerHTML = "Copied!!";
 }
 
 function outFuncLink() {
-    var tooltipLink = document.getElementById("myTooltipLink");
-    tooltipLink.innerHTML = "Copy room link to clipboard";
+  var tooltip = document.getElementById("myTooltipLink");
+  tooltip.innerHTML = "Copy room link to clipboard";
 }
 
-function resumeHandler(data) {
-    document.getElementById("myModal-2").style.display = "block";
-    let myData = myModalgetElementById("theOneWhoLeft");
-    let seconds = myModalgetElementById('seconds');
-    let i = parseInt(10);
-    myData = USERNAMES[id];
-    myData.style.textShadow = `0 ${0 0}${4px ${parseInt(colors[id])}}`;
-    document.getIdById('RESUME').click = function() {
-        resume(id);
-        socket.emit('resume', {
-            room: room_code,
-            id: id,
-            click: myid
-        }, function() {
-            outputMessage({ id: myid, msg: `You have resumed the game without ${USERNAMES[id]}` }, 5);
-            if (chance == id) {
-                socket.emit('chance', { room: room_code, nxt_id: chanceRotation(id, parseInt(0)) });
-            }
-        });
-    };
-    document.getElementById('WAIT').click = function() {
-        wait();
-        socket.emit('wait', {
-            room: room_code,
-            click: myid
-        }, function() {
-            outputMessage({ id: myid, msg: `You have decided to wait` }, 5);
-        });
-    };
-    window.timer = setInterval(function() {
-        i -= parseInt(1);
-        seconds.innerHTML = ` in ${i}`;
-        if (i == parseInt(0)) {
-            resume(id);
-            socket.emit('resume', {
-                room: room_code,
-                id: id,
-                click: id
-            }, function() {
-                outputMessage({ id: id, msg: `Resumed the game without ${USERNAMES[id]}` }, 5);
-                if (chance == id) {
-                    socket.emit('chance', { room: room_code, nxt_id: chanceRotation(id, parseInt(0)) });
-                }
-            });
+function resumeHandler(id) {
+  document.getElementById("myModal-2").style.display = "block";
+  let theOneWhoLeft = document.getElementById('theOneWhoLeft');
+  let seconds = document.getElementById('seconds');
+  let i = 10;
+  theOneWhoLeft.innerHTML = USERNAMES[id];
+  theOneWhoLeft.style.textShadow = `0 0 4px ${colors[id]}`;
+  document.getElementById('RESUME').onclick = function() {
+    resume(id);
+    socket.emit('resume', {
+      room: room_code,
+      id: id,
+      click: myid
+    }, function() {
+      outputMessage({ id: myid, msg: `You have resumed the game without ${USERNAMES[id]}` }, 5);
+      if (chance === id) {
+        socket.emit('chance', { room: room_code, nxt_id: chanceRotation(id, 0) });
+      }
+    });
+  };
+  document.getElementById('WAIT').onclick = function() {
+    wait();
+    socket.emit('wait', {
+      room: room_code,
+      click: myid
+    }, function() {
+      outputMessage({ id: myid, msg: `You have decided to wait` }, 5);
+    });
+  };
+  window.timer = setInterval(function() {
+    i -= 1;
+    seconds.innerHTML = ` in ${i}`;
+    if (i === 0) {
+      resume(id);
+      socket.emit('resume', {
+        room: room_code,
+        id: id,
+        click: id
+      }, function() {
+        outputMessage({ id: id, msg: `Resumed the game without ${USERNAMES[id]}` }, 5);
+        if (chance === id) {
+          socket.emit('chance', { room: room_code, nxt_id: chanceRotation(id, 0) });
         }
-    }, parseInt(id));
+      });
+    }
+  }, 1000);
 }
 
 function resume(id) {
-    document.getElementById("myModal-2").style.display = "none";
-    clearInterval(id);
-    MYROOM.splice(id, parseInt(1));
-    delete(id);
-    allPlayerHandler();
+  document.getElementById("myModal-2").style.display = "none";
+  clearInterval(window.timer);
+  MYROOM.splice(MYROOM.indexOf(id), 1);
+  delete PLAYERS[id];
+  allPlayerHandler();
 }
 
 function wait() {
-    clearInterval(myid);
-    document.getElementById('seconds').innerHTML = '';
-    let butt = document.getElementById('WAIT');
-    if (butt) {
-        butt.disabled = true;
-        butt.style.opacity = '0.6';
-        butt.style.cursor = 'not-allowed';
-    }
+  clearInterval(window.timer);
+  document.getElementById('seconds').innerHTML = '';
+  let butt = document.getElementById('WAIT');
+  if (butt) {
+    butt.disabled = true;
+    butt.style.opacity = '0.6';
+    butt.style.cursor = 'not-allowed';
+  }
 }

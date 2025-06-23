@@ -14,12 +14,12 @@ const io = new Server(server, {
 });
 const port = process.env.PORT || 3000;
 
-// Session middleware
+// Session middleware with hardcoded secret
 const sessionMiddleware = session({
-  secret: 'buddymate-ludo-secret', // Replace with a strong secret
+  secret: 'buddymate-ludo-2025', // Hardcoded secret (secure for testing; consider stronger for production)
   resave: false,
   saveUninitialized: false,
-  store: new (require('express-session').MemoryStore)(), // Use Redis in production
+  store: new (require('express-session').MemoryStore)(),
   cookie: { maxAge: 24 * 60 * 60 * 1000 } // 1 day
 });
 
@@ -76,10 +76,10 @@ app.post('/', (req, res) => {
       console.log(`Player ID ${playerId} joined room ${roomCode}, session ${req.sessionID}`);
       res.redirect(`/${roomCode}`);
     } else {
-      res.redirect('/error-imposter'); // Room full
+      res.redirect('/error-imposter');
     }
   } else {
-    res.redirect('/error-imposter'); // Invalid room code
+    res.redirect('/error-imposter');
   }
 });
 
@@ -108,11 +108,9 @@ io.on('connection', (socket) => {
     return;
   }
 
-  // Update socket ID in room
   rooms.get(roomCode).players.set(sessionId, { id: playerId, socketId: socket.id });
   socket.join(roomCode);
 
-  // Handle 'fetch' event
   socket.on('fetch', (room, callback) => {
     if (room === roomCode) {
       const roomData = rooms.get(roomCode);
@@ -122,7 +120,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle 'roll-dice' event
   socket.on('roll-dice', ({ room, id }, callback) => {
     if (room === roomCode && id === playerId) {
       const num = Math.floor(Math.random() * 6) + 1;
@@ -132,7 +129,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle 'random' event (piece movement)
   socket.on('random', ({ room, id, pid, num }, callback) => {
     if (room === roomCode && id === playerId) {
       io.to(roomCode).emit('Thrown-dice', { id, pid, num, room });
@@ -141,7 +137,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle 'chance' event
   socket.on('chance', ({ room, nxt_id }) => {
     if (room === roomCode) {
       io.to(roomCode).emit('is-it-your-chance', nxt_id);
@@ -149,7 +144,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle 'WON' event
   socket.on('WON', ({ room, id, player }) => {
     if (room === roomCode && id === playerId) {
       io.to(roomCode).emit('winner', id);
@@ -157,7 +151,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle 'resume' event
   socket.on('resume', ({ room, id, click }, callback) => {
     if (room === roomCode && click === playerId) {
       io.to(roomCode).emit('resume', { id, click });
@@ -166,7 +159,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle 'wait' event
   socket.on('wait', ({ room, click }, callback) => {
     if (room === roomCode && click === playerId) {
       io.to(roomCode).emit('wait', { click });
@@ -175,23 +167,19 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle disconnect
   socket.on('disconnect', () => {
     console.log(`Socket disconnected: ${socket.id}, Player ID: ${playerId}, Room: ${roomCode}`);
     if (roomCode && rooms.has(roomCode)) {
       io.to(roomCode).emit('user-disconnected', playerId);
-      // Keep player in room to allow reconnect
-      // Optionally clean up after a timeout
       setTimeout(() => {
         if (rooms.has(roomCode) && !Array.from(rooms.get(roomCode).players.values()).some(p => p.socketId)) {
           rooms.delete(roomCode);
           console.log(`Room ${roomCode} deleted due to inactivity`);
         }
-      }, 10 * 60 * 1000); // 10 minutes
+      }, 10 * 60 * 1000);
     }
   });
 
-  // Notify new user joined
   io.to(roomCode).emit('new-user-joined', { id: playerId });
 });
 

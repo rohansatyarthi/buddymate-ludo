@@ -208,26 +208,30 @@ socket.on('connect', function() {
     console.log('You are connected to the server!!');
 
     socket.emit('fetch', room_code, function(data, id) {
-    MYROOM = data.sort(function(a, b) { return a - b });
-    for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i] }
-    myid = id;
-    console.log('Fetched room:', MYROOM, myid, chance);
-    const isCreatingRoom = data.length === 0 && window.location.href.endsWith(room_code);
-    if (isCreatingRoom && window.Android) {
-        window.Android.sendRoomCode(room_code);
-    }
-    if (myid >= 0 && myid < USERNAMES.length) {
-        document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
-        StartTheGame();
+        MYROOM = data ? data.sort((a, b) => a - b).map(Number) : [0]; // Fallback to [0] if data is null/undefined
+        myid = Number(id) >= 0 && Number(id) < USERNAMES.length ? Number(id) : 0; // Fallback to 0 if invalid
+        console.log('Fetched room:', MYROOM, 'myid:', myid, 'chance:', chance);
+        
+        // Ensure room_code is sent for new rooms
+        const isCreatingRoom = !window.location.href.includes('/ludo/') || (data && data.length === 0);
         if (isCreatingRoom && window.Android) {
-            console.log('Sending room code to Android:', room_code);
+            console.log('Sending room code to Android (create):', room_code);
             window.Android.sendRoomCode(room_code);
         }
-    } else {
-        console.error('Invalid myid:', myid);
-        outputMessage({ msg: 'Error: Unable to assign player color' }, 5);
-    }
-});
+
+        if (myid >= 0 && myid < USERNAMES.length) {
+            document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
+            // Ensure player is added to MYROOM if creating a new room
+            if (isCreatingRoom && !MYROOM.includes(myid)) {
+                MYROOM.push(myid);
+                MYROOM.sort((a, b) => a - b);
+            }
+            StartTheGame();
+        } else {
+            console.error('Invalid myid after fallback:', myid);
+            outputMessage({ msg: 'Error: Unable to assign player color' }, 5);
+        }
+    });
 
     if (chance === myid) {
         document.getElementById('randomButt').addEventListener('click', function(event) {
@@ -335,7 +339,7 @@ function outputMessage(anObject, k) {
         div.innerHTML = `<p>It's <span style="color: ${colors[anObject.id]}">${anObject.Name}</span>'s turn!</p>`;
         msgBoard.appendChild(div);
     } else if (k === 5) {
-        const div = document.createElement Exploration_disable('div');
+        const div = document.createElement('div');
         div.classList.add('messageFromServer');
         div.innerHTML = `<p><span style="color: ${colors[anObject.id]}">${anObject.msg}</span></p>`;
         msgBoard.appendChild(div);
@@ -417,7 +421,7 @@ function StartTheGame() {
     MYROOM.forEach(function(numb) {
         numb === myid ? outputMessage({ Name: 'You', id: numb }, 0) : outputMessage({ Name: USERNAMES[numb], id: numb }, 0)
     });
-    document.getElementById('my-name').innerHTML += USERNAMES[myid];
+    document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
     console.log(myid);
     let copyText = `\n\nMy room:\n${window.location.href} \nor join the room via\nMy room code:${room_code}`
     document.getElementById('copy').textContent += copyText;
@@ -436,47 +440,47 @@ function loadAllPieces() {
         let img = new Image();
         img.src = "/images/pieces/" + colors[i].toLowerCase() + ".png";
         img.onload = () => {
-    ++cnt;
-    if (cnt >= colors.length) {
-        for (let j = 0; j < MYROOM.length; j++) {
-            PLAYERS[MYROOM[j]] = new Player(MYROOM[j]);
-        }
-        if (MYROOM.includes(myid)) {
-            allPlayerHandler();
-            outputMessage({ Name: 'You', id: myid }, 0);
-        } else {
-            console.error('myid not in MYROOM:', myid, MYROOM);
-        }
-    }
-    // Moved localStorage handling outside
-    if (cnt >= colors.length) { // Ensure all images are loaded before handling localStorage
-        if (window.localStorage.getItem('room') === room_code) {
-            console.log('Yes my localStorage is for this room');
-            if (window.localStorage.getItem('started') === 'true') {
-                console.log('Yes I am from this room');
-                chance = parseInt(window.localStorage.getItem('chance'));
-                let positions = JSON.parse(window.localStorage.getItem('positions'));
-                let win = JSON.parse(window.localStorage.getItem('win'));
-                for (let i = 0; i < MYROOM.length; i++) {
-                    PLAYERS[MYROOM[i]].won = parseInt(win[i]);
-                    for (let j = 0; j < 4; j++) {
-                        console.log('Yes room==room_code && started==true:', i, j);
-                        PLAYERS[MYROOM[i]].myPieces[j].x = parseInt(positions[MYROOM[i]][j].x);
-                        PLAYERS[MYROOM[i]].myPieces[j].y = parseInt(positions[MYROOM[i]][j].y);
-                        PLAYERS[MYROOM[i]].myPieces[j].pos = parseInt(positions[MYROOM[i]][j].pos);
-                    }
+            ++cnt;
+            if (cnt >= colors.length) {
+                for (let j = 0; j < MYROOM.length; j++) {
+                    PLAYERS[MYROOM[j]] = new Player(MYROOM[j]);
                 }
-                allPlayerHandler();
-            } else {
-                allPlayerHandler();
+                if (MYROOM.includes(myid)) {
+                    allPlayerHandler();
+                    outputMessage({ Name: 'You', id: myid }, 0);
+                } else {
+                    console.error('myid not in MYROOM:', myid, MYROOM);
+                }
             }
-        } else {
-            window.localStorage.clear();
-            window.localStorage.setItem('room', room_code);
-            allPlayerHandler();
+            // Moved localStorage handling outside
+            if (cnt >= colors.length) { // Ensure all images are loaded before handling localStorage
+                if (window.localStorage.getItem('room') === room_code) {
+                    console.log('Yes my localStorage is for this room');
+                    if (window.localStorage.getItem('started') === 'true') {
+                        console.log('Yes I am from this room');
+                        chance = parseInt(window.localStorage.getItem('chance'));
+                        let positions = JSON.parse(window.localStorage.getItem('positions'));
+                        let win = JSON.parse(window.localStorage.getItem('win'));
+                        for (let i = 0; i < MYROOM.length; i++) {
+                            PLAYERS[MYROOM[i]].won = parseInt(win[i]);
+                            for (let j = 0; j < 4; j++) {
+                                console.log('Yes room==room_code && started==true:', i, j);
+                                PLAYERS[MYROOM[i]].myPieces[j].x = parseInt(positions[MYROOM[i]][j].x);
+                                PLAYERS[MYROOM[i]].myPieces[j].y = parseInt(positions[MYROOM[i]][j].y);
+                                PLAYERS[MYROOM[i]].myPieces[j].pos = parseInt(positions[MYROOM[i]][j].pos);
+                            }
+                        }
+                        allPlayerHandler();
+                    } else {
+                        allPlayerHandler();
+                    }
+                } else {
+                    window.localStorage.clear();
+                    window.localStorage.setItem('room', room_code);
+                    allPlayerHandler();
+                }
+            }
         }
-    }
-}
         PIECES.push(img);
     }
 }

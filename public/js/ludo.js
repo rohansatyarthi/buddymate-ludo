@@ -37,17 +37,17 @@ class Player {
     this.id = String(id);
     this.myPieces = {};
     for (let i = 0; i < 4; i++) {
-      this.myPieces[i] = new Piece(String(i), String(id));
+      this.myPieces[i] = new Piece(String(i), this.id);
     }
     this.won = 0;
   }
   draw() {
-    for (let i = 0; i < 4; i++) {
+    for (let i in this.myPieces) {
       this.myPieces[i].draw();
     }
   }
   didIwin() {
-    return this.won === 4 ? 1 : 0;
+    return this.won >= 4 ? 1 : 0;
   }
 }
 
@@ -214,12 +214,18 @@ class Piece {
 
 socket.on('connect', function() {
   console.log(`Connected with socket ID: ${socket.id}, myid: ${myid}`);
+  console.log('localStorage on connect:', {
+    room: window.localStorage.getItem('room'),
+    started: window.localStorage.getItem('started'),
+    chance: window.localStorage.getItem('chance'),
+    positions: window.localStorage.getItem('positions'),
+    win: window.localStorage.getItem('win')
+  });
   socket.emit('fetch', room_code, function(data, id) {
     console.log(`Fetched room ${room_code}: ${data}, myid: ${id}`);
     MYROOM = data.sort((a, b) => a - b);
     for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i]; }
     myid = id;
-    // Sync state with server
     const localPositions = JSON.parse(window.localStorage.getItem('positions') || '{}');
     const localChance = Number(window.localStorage.getItem('chance') || -1);
     const localWin = JSON.parse(window.localStorage.getItem('win') || '{}');
@@ -230,6 +236,10 @@ socket.on('connect', function() {
       win: localWin
     }, function(serverState) {
       console.log('Server state received:', serverState);
+      if (!serverState || !serverState.positions || Object.keys(serverState.positions).length === 0) {
+        console.log('Server state empty, using localStorage');
+        serverState = { positions: localPositions, chance: localChance, win: localWin };
+      }
       StartTheGame(serverState);
     });
   });
@@ -246,21 +256,23 @@ socket.on('connect', function() {
 
 socket.on('state-updated', function(serverState) {
   console.log('State updated from server:', serverState);
-  chance = Number(serverState.chance);
-  window.localStorage.setItem('chance', chance.toString());
-  window.localStorage.setItem('positions', JSON.stringify(serverState.positions));
-  window.localStorage.setItem('win', JSON.stringify(serverState.win));
-  for (let id in serverState.positions) {
-    if (PLAYERS[id]) {
-      for (let pid in serverState.positions[id]) {
-        PLAYERS[id].myPieces[pid].x = Number(serverState.positions[id][pid].x);
-        PLAYERS[id].myPieces[pid].y = Number(serverState.positions[id][pid].y);
-        PLAYERS[id].myPieces[pid].pos = Number(serverState.positions[id][pid].pos);
+  if (serverState && serverState.positions) {
+    chance = Number(serverState.chance);
+    window.localStorage.setItem('chance', chance.toString());
+    window.localStorage.setItem('positions', JSON.stringify(serverState.positions));
+    window.localStorage.setItem('win', JSON.stringify(serverState.win));
+    for (let id in serverState.positions) {
+      if (PLAYERS[id]) {
+        for (let pid in serverState.positions[id]) {
+          PLAYERS[id].myPieces[pid].x = Number(serverState.positions[id][pid].x);
+          PLAYERS[id].myPieces[pid].y = Number(serverState.positions[id][pid].y);
+          PLAYERS[id].myPieces[pid].pos = Number(serverState.positions[id][pid].pos);
+        }
+        PLAYERS[id].won = Number(serverState.win[id] || 0);
       }
-      PLAYERS[id].won = Number(serverState.win[id] || 0);
     }
+    allPlayerHandler();
   }
-  allPlayerHandler();
 });
 
 socket.on('imposter', () => { window.location.replace('/error-imposter'); });
@@ -446,15 +458,16 @@ function diceAction() {
 }
 
 function StartTheGame(serverState) {
+  console.log('Starting game with state:', serverState);
   MYROOM.forEach((numb) => {
     numb === myid
       ? outputMessage({ Name: 'You', id: numb }, 0)
       : outputMessage({ Name: USERNAMES[numb], id: numb }, 0);
   });
   document.getElementById('my-name').innerHTML += USERNAMES[myid];
-  console.log('myid:', myid);
   let copyText = `\n\nMy room:\n${window.location.href} \nor join the room via\nMy room code:${room_code}`;
   document.getElementById('copy').innerHTML += copyText;
+  window.localStorage.setItem('room', room_code);
   if (MYROOM.length === 1) {
     styleButton(1);
     chance = Number(myid);
@@ -464,6 +477,7 @@ function StartTheGame(serverState) {
 }
 
 function loadAllPieces(serverState) {
+  console.log('Loading pieces with state:', serverState);
   let cnt = 0;
   for (let i = 0; i < colors.length; i++) {
     let img = new Image();
@@ -474,9 +488,26 @@ function loadAllPieces(serverState) {
         for (let j = 0; j < MYROOM.length; j++) {
           PLAYERS[MYROOM[j]] = new Player(MYROOM[j]);
         }
-        if (window.localStorage.getItem('room') === room_code && window.localStorage.getItem('started') === 'true' && !serverState) {
+        if (serverState && serverState.positions && Object.keys(serverState.positions).length > 0) {
+          console.log('Restoring from server state:', serverState);
+          chance = Number(serverState.chance);
+          window.localStorage.setItem('chance', chance.toString());
+          window.localStorage.setItem('positions', JSON.stringify(serverState.positions));
+          window.localStorage.setItem('win', JSON.stringify(serverState.win));
+          for (let id in serverState.positions) {
+            if (PLAYERS[id]) {
+              for (let pid in serverState.positions[id]) {
+                console.log(`Restoring ${id}, piece ${pid}: x=${serverState.positions[id][pid].x}, y=${serverState.positions[id][pid].y}, pos=${serverState.positions[id][pid].pos}`);
+                PLAYERS[id].myPieces[pid].x = Number(serverState.positions[id][pid].x);
+                PLAYERS[id].myPieces[pid].y = Number(serverState.positions[id][pid].y);
+                PLAYERS[id].myPieces[pid].pos = Number(serverState.positions[id][pid].pos);
+              }
+              PLAYERS[id].won = Number(serverState.win[id] || 0);
+            }
+          }
+        } else if (window.localStorage.getItem('room') === room_code && window.localStorage.getItem('started') === 'true') {
           console.log('Restoring from localStorage');
-          chance = Number(window.localStorage.getItem('chance'));
+          chance = Number(window.localStorage.getItem('chance') || -1);
           let positions = JSON.parse(window.localStorage.getItem('positions') || '{}');
           let win = JSON.parse(window.localStorage.getItem('win') || '{}');
           for (let i = 0; i < MYROOM.length; i++) {
@@ -490,19 +521,14 @@ function loadAllPieces(serverState) {
               }
             }
           }
-        } else if (serverState) {
-          console.log('Restoring from server state:', serverState);
-          chance = Number(serverState.chance);
-          for (let id in serverState.positions) {
-            if (PLAYERS[id]) {
-              for (let pid in serverState.positions[id]) {
-                PLAYERS[id].myPieces[pid].x = Number(serverState.positions[id][pid].x);
-                PLAYERS[id].myPieces[pid].y = Number(serverState.positions[id][pid].y);
-                PLAYERS[id].myPieces[pid].pos = Number(serverState.positions[id][pid].pos);
-              }
-              PLAYERS[id].won = Number(serverState.win[id] || 0);
-            }
-          }
+          socket.emit('sync-state', {
+            room: room_code,
+            positions,
+            chance,
+            win
+          }, function(updatedServerState) {
+            console.log('Local state synced to server:', updatedServerState);
+          });
         }
         allPlayerHandler();
       }
@@ -529,20 +555,24 @@ function chanceRotation(id, num) {
 
 function allPlayerHandler() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (let i = 0; i < Object.keys(PLAYERS).length; i++) {
-    PLAYERS[MYROOM[i]].draw();
+  for (let i = 0; i < MYROOM.length; i++) {
+    if (PLAYERS[MYROOM[i]]) {
+      PLAYERS[MYROOM[i]].draw();
+    }
   }
   let positions = {};
   let win = {};
   for (let i = 0; i < MYROOM.length; i++) {
-    positions[MYROOM[i]] = {};
-    win[MYROOM[i]] = PLAYERS[MYROOM[i]].won;
-    for (let j = 0; j < 4; j++) {
-      positions[MYROOM[i]][j] = {
-        x: PLAYERS[MYROOM[i]].myPieces[j].x,
-        y: PLAYERS[MYROOM[i]].myPieces[j].y,
-        pos: PLAYERS[MYROOM[i]].myPieces[j].pos
-      };
+    if (PLAYERS[MYROOM[i]]) {
+      positions[MYROOM[i]] = {};
+      win[MYROOM[i]] = PLAYERS[MYROOM[i]].won;
+      for (let j = 0; j < 4; j++) {
+        positions[MYROOM[i]][j] = {
+          x: PLAYERS[MYROOM[i]].myPieces[j].x,
+          y: PLAYERS[MYROOM[i]].myPieces[j].y,
+          pos: PLAYERS[MYROOM[i]].myPieces[j].pos
+        };
+      }
     }
   }
   window.localStorage.setItem('started', 'true');
@@ -578,7 +608,7 @@ function loadNewPiece(id) {
   }
   socket.emit('sync-state', {
     room: room_code,
-    positions: { [id]: PLAYERS[id].myPieces },
+    positions: { [id]: Object.fromEntries(Object.entries(PLAYERS[id].myPieces).map(([pid, piece]) => [pid, { x: piece.x, y: piece.y, pos: piece.pos }])) },
     win: { [id]: PLAYERS[id].won }
   }, function(serverState) {
     console.log('New player state synced:', serverState);

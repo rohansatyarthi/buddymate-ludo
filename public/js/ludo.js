@@ -1,6 +1,6 @@
 let socket = io(window.location.href.substring(0, window.location.href.length - 7));
 
-const room_code = window.location.href.substring(window.location.href.length - 6);
+const room_code = window.location.href.split('/ludo/').pop()?.substring(0, 6) || generateNewRoomCode();
 const USERNAMES = ['Green Warrior', 'Red Fire', 'Blue Fox', 'Yellow Rhino'];
 const PIECES = [];
 const colors = ["green", "red", "blue", "yellow"];
@@ -33,7 +33,7 @@ class Player {
         this.id = String(id);
         this.myPieces = new Object();
         for (let i = 0; i < 4; i++) {
-            this.myPieces[i] = new Piece(String(i), String(id));
+            this.myPieces[i] = new Piece(String(id), String(i));
         }
         this.won = parseInt(0);
     }
@@ -53,10 +53,10 @@ class Player {
 }
 
 class Piece {
-    constructor(i, id) {
+    constructor(id, colorid) {
         this.path = [];
-        this.color_id = String(id);
-        this.Pid = String(i);
+        this.color_id = String(colorid);
+        this.Pid = String(id);
         this.pos = -1;
         this.x = parseInt(allPiecesePos[this.color_id][this.Pid].x);
         this.y = parseInt(allPiecesePos[this.color_id][this.Pid].y);
@@ -64,78 +64,78 @@ class Piece {
         switch (id) {
             case '0':
                 for (let i = 0; i < 4; i++) { this.path.push(this.oneStepToRight) }
-                this.path.push(this.oneStepTowards45);
+                this.path.push(this.oneStepTo45);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToTop) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToRight) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToBottom) }
-                this.path.push(this.oneStepTowards315)
+                this.path.push(this.oneStepTo315);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToRight) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToBottom) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToLeft) }
-                this.path.push(this.oneStepTowards225)
+                this.path.push(this.oneStepTo225);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToBottom) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToLeft) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToTop) }
-                this.path.push(this.oneStepTowards135)
+                this.path.push(this.oneStepTo135);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToLeft) }
-                this.path.push(this.oneStepToTop)
+                this.path.push(this.oneStepToTop);
                 for (let i = 0; i < 6; i++) { this.path.push(this.oneStepToRight) }
                 break;
             case '1':
                 for (let i = 0; i < 4; i++) { this.path.push(this.oneStepToBottom) }
-                this.path.push(this.oneStepTowards315)
+                this.path.push(this.oneStepTo315);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToRight) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToBottom) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToLeft) }
-                this.path.push(this.oneStepTowards225)
+                this.path.push(this.oneStepTo225);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToBottom) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToLeft) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToTop) }
-                this.path.push(this.oneStepTowards135)
+                this.path.push(this.oneStepTo135);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToLeft) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToTop) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToRight) }
-                this.path.push(this.oneStepTowards45);
+                this.path.push(this.oneStepTo45);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToTop) }
-                this.path.push(this.oneStepToRight)
+                this.path.push(this.oneStepToRight);
                 for (let i = 0; i < 6; i++) { this.path.push(this.oneStepToBottom) }
                 break;
             case '2':
                 for (let i = 0; i < 4; i++) { this.path.push(this.oneStepToLeft) }
-                this.path.push(this.oneStepTowards225)
+                this.path.push(this.oneStepTo225);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToBottom) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToLeft) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToTop) }
-                this.path.push(this.oneStepTowards135)
+                this.path.push(this.oneStepTo135);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToLeft) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToTop) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToRight) }
-                this.path.push(this.oneStepTowards45);
+                this.path.push(this.oneStepTo45);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToTop) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToRight) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToBottom) }
-                this.path.push(this.oneStepTowards315)
+                this.path.push(this.oneStepTo315);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToRight) }
-                this.path.push(this.oneStepToBottom)
+                this.path.push(this.oneStepToBottom);
                 for (let i = 0; i < 6; i++) { this.path.push(this.oneStepToLeft) }
                 break;
             case '3':
                 for (let i = 0; i < 4; i++) { this.path.push(this.oneStepToTop) }
-                this.path.push(this.oneStepTowards135)
+                this.path.push(this.oneStepTo135);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToLeft) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToTop) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToRight) }
-                this.path.push(this.oneStepTowards45);
+                this.path.push(this.oneStepTo45);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToTop) }
                 for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToRight) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToBottom) }
-                this.path.push(this.oneStepTowards315)
+                this.path.push(this.oneStepTo315);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToRight) }
-                for (let i = 0; i < 2; i++) this.path.push(this.oneStepToBottom)
+                for (let i = 0; i < 2; i++) { this.path.push(this.oneStepToBottom) }
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToLeft) }
-                this.path.push(this.oneStepTowards225)
+                this.path.push(this.oneStepTo225);
                 for (let i = 0; i < 5; i++) { this.path.push(this.oneStepToBottom) }
-                this.path.push(this.oneStepToLeft)
+                this.path.push(this.oneStepToLeft);
                 for (let i = 0; i < 6; i++) { this.path.push(this.oneStepToTop) }
                 break;
         }
@@ -155,8 +155,8 @@ class Piece {
                 window.PLAYERS[this.color_id].won += 1;
             }
         } else if (num == 6 && this.pos == -1) {
-            this.x = homeTilePos[this.color_id][0].x
-            this.y = homeTilePos[this.color_id][0].y
+            this.x = homeTilePos[this.color_id][0].x;
+            this.y = homeTilePos[this.color_id][0].y;
             this.pos = 0;
         }
     }
@@ -177,22 +177,22 @@ class Piece {
         window.PLAYERS[id].myPieces[pid].y += 50;
     }
 
-    oneStepTowards45(id, pid) {
+    oneStepTo45(id, pid) {
         window.PLAYERS[id].myPieces[pid].x += 50;
         window.PLAYERS[id].myPieces[pid].y -= 50;
     }
 
-    oneStepTowards135(id, pid) {
+    oneStepTo135(id, pid) {
         window.PLAYERS[id].myPieces[pid].x -= 50;
         window.PLAYERS[id].myPieces[pid].y -= 50;
     }
 
-    oneStepTowards225(id, pid) {
+    oneStepTo225(id, pid) {
         window.PLAYERS[id].myPieces[pid].x -= 50;
         window.PLAYERS[id].myPieces[pid].y += 50;
     }
 
-    oneStepTowards315(id, pid) {
+    oneStepTo315(id, pid) {
         window.PLAYERS[id].myPieces[pid].x += 50;
         window.PLAYERS[id].myPieces[pid].y += 50;
     }
@@ -207,21 +207,36 @@ class Piece {
 socket.on('connect', function() {
     console.log('You are connected to the server!!');
 
-    socket.emit('fetch', room_code, function(data, id) {
-        MYROOM = data ? data.sort((a, b) => a - b).map(Number) : [0]; // Fallback to [0] if data is null/undefined
-        myid = Number(id) >= 0 && Number(id) < USERNAMES.length ? Number(id) : 0; // Fallback to 0 if invalid
+    socket.emit('fetch', room_code, function(data, id, error) {
+        if (error || data === null || id === null) {
+            console.error('Fetch error or invalid response:', error, data, id);
+            outputMessage({ msg: 'Error: Invalid or full room. Retrying...' }, 5);
+            const newRoomCode = generateNewRoomCode();
+            if (window.Android) {
+                console.log('Sending new room code to Android:', newRoomCode);
+                window.Android.sendRoomCode(newRoomCode);
+            }
+            // Retry with new room code via fetch
+            socket.emit('fetch', newRoomCode, function(newData, newId, newError) {
+                if (newError || newData === null || newId === null) {
+                    console.error('Retry failed:', newError, newData, newId);
+                    outputMessage({ msg: 'Error: Unable to create room. Please try again.' }, 5);
+                    return;
+                }
+                window.location.href = `/ludo/${newRoomCode}`;
+            });
+            return;
+        }
+        MYROOM = data ? data.sort((a, b) => a - b).map(Number) : [0];
+        myid = Number(id) >= 0 && Number(id) < USERNAMES.length ? Number(id) : 0;
         console.log('Fetched room:', MYROOM, 'myid:', myid, 'chance:', chance);
-        
-        // Ensure room_code is sent for new rooms
         const isCreatingRoom = !window.location.href.includes('/ludo/') || (data && data.length === 0);
         if (isCreatingRoom && window.Android) {
             console.log('Sending room code to Android (create):', room_code);
             window.Android.sendRoomCode(room_code);
         }
-
         if (myid >= 0 && myid < USERNAMES.length) {
             document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
-            // Ensure player is added to MYROOM if creating a new room
             if (isCreatingRoom && !MYROOM.includes(myid)) {
                 MYROOM.push(myid);
                 MYROOM.sort((a, b) => a - b);
@@ -242,14 +257,30 @@ socket.on('connect', function() {
         });
     }
 
-    socket.on('imposter', () => { window.location.replace("/error-imposter"); });
+    socket.on('imposter', () => {
+        console.warn('Imposter detected, retrying with new room');
+        outputMessage({ msg: 'Room invalid or full. Retrying...' }, 5);
+        const newRoomCode = generateNewRoomCode();
+        if (window.Android) {
+            console.log('Sending new room code to Android (imposter):', newRoomCode);
+            window.Android.sendRoomCode(newRoomCode);
+        }
+        socket.emit('fetch', newRoomCode, function(data, id, error) {
+            if (error || data === null || id === null) {
+                console.error('Imposter retry failed:', error, data, id);
+                outputMessage({ msg: 'Error: Unable to create room. Please try again.' }, 5);
+                return;
+            }
+            window.location.href = `/ludo/${newRoomCode}`;
+        });
+    });
 
     socket.on('is-it-your-chance', function(data) {
         if (data === myid) {
             styleButton(1);
-            outputMessage({ Name: 'your', id: data }, 4)
+            outputMessage({ Name: 'your', id: data }, 4);
         } else {
-            outputMessage({ Name: USERNAMES[data] + "'s", id: data }, 4)
+            outputMessage({ Name: USERNAMES[data] + "'s", id: data }, 4);
         }
         chance = Number(data);
         window.localStorage.setItem('chance', chance.toString());
@@ -259,30 +290,30 @@ socket.on('connect', function() {
         MYROOM.push(data.id);
         MYROOM = [...new Set(MYROOM)];
         MYROOM.sort(function(a, b) { return a - b });
-        for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i] }
+        for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i]; }
         loadNewPiece(data.id);
         outputMessage({ Name: USERNAMES[data.id], id: data.id }, 0);
         document.getElementById("myModal-2").style.display = "none";
         let butt = document.getElementById('WAIT');
         butt.disabled = false;
         butt.style.opacity = '1';
-        butt.style.cursor = "pointer"
+        butt.style.cursor = "pointer";
         clearInterval(window.timer);
     });
 
     socket.on('user-disconnected', function(data) {
         outputMessage({ Name: USERNAMES[data], id: data }, 6);
         resumeHandler(data);
-    })
+    });
 
     socket.on('resume', function(data) {
         resume(data.id);
-        data.id == data.click ? outputMessage({ id: data.id, msg: `Resumed the game without ${USERNAMES[data.id]}` }, 5) : outputMessage({ id: data.click, msg: `${USERNAMES[data.click]} has resumed the game without ${USERNAMES[data.id]}` }, 5)
+        data.id == data.click ? outputMessage({ id: data.id, msg: `Resumed the game without ${USERNAMES[data.id]}` }, 5) : outputMessage({ id: data.click, msg: `${USERNAMES[data.click]} has resumed the game without ${USERNAMES[data.id]}` }, 5);
     });
 
     socket.on('wait', function(data) {
         wait();
-        outputMessage({ id: data.click, msg: `${USERNAMES[data.click]} has decided to wait` }, 5)
+        outputMessage({ id: data.click, msg: `${USERNAMES[data.click]} has decided to wait` }, 5);
     });
 
     socket.on('rolled-dice', function(data) {
@@ -308,12 +339,12 @@ socket.on('connect', function() {
 
     socket.on('winner', function(data) {
         showModal(data);
-    })
+    });
 });
 
 socket.on('disconnect', function() {
     console.log('You are disconnected to the server');
-})
+});
 
 function outputMessage(anObject, k) {
     let msgBoard = document.querySelector('.msgBoard');
@@ -386,7 +417,7 @@ function diceAction() {
                     room: room_code,
                     id: myid,
                     num: num
-                }
+                };
                 let alert1 = true;
 
                 for (let i = 0; i < 4; i++) {
@@ -409,21 +440,21 @@ function diceAction() {
                     }
                 }
                 if (alert1) { alert('You need to click on a piece of your color'); }
-            })
+            });
         } else {
             socket.emit('chance', { room: room_code, nxt_id: chanceRotation(myid, num) });
             console.log('Next chance');
         }
-    })
+    });
 }
 
 function StartTheGame() {
     MYROOM.forEach(function(numb) {
-        numb === myid ? outputMessage({ Name: 'You', id: numb }, 0) : outputMessage({ Name: USERNAMES[numb], id: numb }, 0)
+        numb === myid ? outputMessage({ Name: 'You', id: numb }, 0) : outputMessage({ Name: USERNAMES[numb], id: numb }, 0);
     });
     document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
     console.log(myid);
-    let copyText = `\n\nMy room:\n${window.location.href} \nor join the room via\nMy room code:${room_code}`
+    let copyText = `\n\nMy room:\n${window.location.href} \nor join the room via\nMy room code:${room_code}`;
     document.getElementById('copy').textContent += copyText;
     if (MYROOM.length === 1) {
         styleButton(1);
@@ -452,8 +483,7 @@ function loadAllPieces() {
                     console.error('myid not in MYROOM:', myid, MYROOM);
                 }
             }
-            // Moved localStorage handling outside
-            if (cnt >= colors.length) { // Ensure all images are loaded before handling localStorage
+            if (cnt >= colors.length) {
                 if (window.localStorage.getItem('room') === room_code) {
                     console.log('Yes my localStorage is for this room');
                     if (window.localStorage.getItem('started') === 'true') {
@@ -480,7 +510,7 @@ function loadAllPieces() {
                     allPlayerHandler();
                 }
             }
-        }
+        };
         PIECES.push(img);
     }
 }
@@ -511,11 +541,11 @@ function allPlayerHandler() {
             console.error('No player found for ID:', MYROOM[i]);
         }
     }
-    let positions = {}
-    let win = {}
+    let positions = {};
+    let win = {};
     for (let i = 0; i < MYROOM.length; i++) {
-        positions[MYROOM[i]] = {}
-        win[MYROOM[i]] = PLAYERS[MYROOM[i]].won
+        positions[MYROOM[i]] = {};
+        win[MYROOM[i]] = PLAYERS[MYROOM[i]].won;
         for (let j = 0; j < 4; j++) {
             positions[MYROOM[i]][j] = {
                 x: PLAYERS[MYROOM[i]].myPieces[j].x,
@@ -533,19 +563,20 @@ function allPlayerHandler() {
 function loadNewPiece(id) {
     PLAYERS[id] = new Player(id);
     if (window.localStorage.getItem('room') === room_code) {
-        console.log('Yes I\'m from our room');
+        console.log('Yes I\'m from my room');
         if (window.localStorage.getItem('started')) {
-            console.log('yes i have already started the game');
+            console.log('Yes I have started the game');
             let positions = JSON.parse(window.localStorage.getItem('positions'));
             let win = JSON.parse(window.localStorage.getItem('win'));
             if (positions[id]) {
-                console.log(`yes I have some data for user of id: ${id} in my local storage\nIt is ${positions[id]}`);
+                console.log(`Yes I have data for user of ID: ${id} in my local storage\nIt is ${positions[id]}`);
                 PLAYERS[id].won = parseInt(win[id]);
-                for (let j = 0; j < 4; j++) {
-                    console.log(`for ${id},${j}\nx:${parseInt(positions[id][j].x)}\ny:${parseInt(positions[id][j].y)}\npos:${parseInt(positions[id][j].pos)}`);
-                    PLAYERS[id].myPieces[j].x = parseInt(positions[id][j].x);
-                    PLAYERS[id].myPieces[j].y = parseInt(positions[id][j].y);
-                    PLAYERS[id].myPieces[j].pos = parseInt(positions[id][j].pos);
+                for (let j = id0; j++) { positions[id]; }
+                for (let i = 0; i < 4; i++) {
+                    console.log(`for ${id}, ${j}\n${i}\nx${id}: ${parseInt(positions[id][i].x)}\n${id}: ${parseInt(positions[id][i].y)}, ${parseInt(id)}\npos${i}: ${parseInt(id)}`);
+                    PLAYERS[id].myPieces[i].x = parseInt(positions[id][i].x);
+                    PLAYERS[id].myPieces[i].y = parseInt(positions[id][i].y);
+                    PLAYERS[id].myPieces[i].pos = parseInt(positions[id][i].pos);
                 }
             }
         }
@@ -557,10 +588,10 @@ function iKill(id, pid) {
     let boss = PLAYERS[id].myPieces[pid];
     for (let i = 0; i < MYROOM.length; i++) {
         for (let j = 0; j < 4; j++) {
-            if (MYROOM[i] !== id && boss.x === PLAYERS[MYROOM[i]].myPieces[j].x && boss.y === PLAYERS[MYROOM[i]].myPieces[j].y) {
+            if (MYROOM[i] !== id && boss.x === PLAYERS[id].myPieces[j].x && boss.y === PLAYERS[id].myPieces[j].y) {
                 if (!inAhomeTile(id, pid)) {
-                    PLAYERS[MYROOM[i]].myPieces[j].kill();
-                    return 1;
+                    PLAYERS[id].myPieces[j].kill();
+                    return 0;
                 }
             }
         }
@@ -613,7 +644,7 @@ async function copyLinkHandler() {
 
 function wait() {
     document.getElementById("myModal-2").style.display = "block";
-    let butt = document.getElementById('WAIT');
+    let butt = document.getElementById('my-button');
     butt.disabled = true;
     butt.style.opacity = '0.6';
     butt.style.cursor = "not-allowed";
@@ -624,7 +655,7 @@ function resume(id) {
         return ele != id;
     });
     document.getElementById("myModal-2").style.display = "none";
-    let butt = document.getElementById('WAIT');
+    let butt = document.getElementById('my-button');
     butt.disabled = false;
     butt.style.opacity = '1';
     butt.style.cursor = "pointer";
@@ -651,4 +682,9 @@ function resumeHandler(id) {
             }
         }, 1000);
     }
+}
+
+function generateNewRoomCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    return Array(6).fill().map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
 }

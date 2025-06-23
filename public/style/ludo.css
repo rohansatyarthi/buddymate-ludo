@@ -4,25 +4,18 @@
 
 body {
     border: 0;
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden; /* Prevent horizontal scroll on mobile */
 }
 
-/* Navbar */
-.navBar {
+/*/// navbar ///*/
+.navBar{
     background-color: #333;
     overflow: hidden;
     border-radius: 3px;
     font-family: "Audiowide", sans-serif;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 10px;
 }
 
 .navBar a {
+    float: left;
     color: #f2f2f2;
     text-align: center;
     padding: 14px 16px;
@@ -42,27 +35,33 @@ body {
 }
 
 #my-name {
+    /* float: right; */
+    position: absolute;
+    right: 2px;
     color: #f2f2f2;
     text-align: center;
     padding: 14px 16px;
     font-size: 17px;
-    margin: 0;
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
-/* Copy Wrapper */
+/*///copy///*/
 .copy-wrapper .copy-content {
     display: none;
     position: absolute;
-    right: 10px;
-    top: 50px;
+    right: 25px;
+    top: 60px;
     z-index: 1;
     border-radius: 5px;
     padding: 10px 15px;
     box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
-    background-color: #fff;
 }
 
 .copy-wrapper {
+    float: left;
+    overflow: hidden;
+    right: 2px;
     text-align: center;
 }
 
@@ -81,9 +80,23 @@ body {
     margin-bottom: 10px;
     font-family: sans-serif;
     font-size: 14px;
-    width: 100%;
-    max-width: 300px;
 }
+
+/* .copy-content #copy-btn {
+    background-image: linear-gradient(to bottom right, red, yellow);
+    color: white;
+    font-size: 20px;
+    padding: 2px 6px;
+    border-radius: 6px;
+    transition-duration: 0.4s;
+    box-shadow: 0 6px 8px 0 rgba(0,0,0,0.14), 0 17px 50px 0 rgba(0,0,0,0.09);
+}
+
+.copy-content #copy-btn:hover {
+    border: 1px solid white;
+    cursor: pointer;
+    box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
+} */
 
 .tooltip {
     position: relative;
@@ -102,7 +115,7 @@ body {
     z-index: 1;
     bottom: 150%;
     left: 50%;
-    margin-left: -70px;
+    margin-left: -75px;
     opacity: 0;
     transition: opacity 0.3s;
     font-size: 12px;
@@ -124,77 +137,83 @@ body {
     opacity: 1;
 }
 
-/* Heading */
+/*/// heading ///*/
 .heading-tile {
     text-align: center;
     border-radius: 5px;
     font-family: "Audiowide", sans-serif;
     box-shadow: 0 4px 8px 0 rgba(0,0,0,0.8);
     transition: 0.3s;
+    border-radius: 5px;
     height: 3rem;
     width: max-content;
     position: absolute;
     top: 7.5%;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 40%;
 }
 
-.heading-tile:hover {
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.8);
+.heading-tile:hover{
+    text-align: center;
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0,0.8);
 }
 
 .heading-tile h2 {
     padding: 2px 16px;
     text-shadow: 3px 3px 3px #ababab;
+    text-align: center;
     color: rgb(111, 143, 101);
-    margin: 10px 0 0 0;
+    height: max-content;
+    width: max-content;
+    cursor: text;
+    margin-top: 0;
+    margin-bottom: 0;
+    padding-top: 10px;
 }
 
 .heading-tile h2:hover {
+    text-align: center;
     color: rgb(175, 192, 153);
 }
 
-/* Modal */
 .modal {
-    display: none;
-    position: fixed;
-    z-index: 3;
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 3; /* Sit on top */
     left: 0;
     top: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.4);
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    /*overflow: auto; /* Enable scroll if needed */
+    background-color: rgb(0,0,0); /* Fallback color */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
 }
-
+  
+/* Modal Content/Box */
 .modal-content {
     background-color: #fefefe;
-    margin: 7% auto;
+    margin: 7% auto; /* 7% from the top and centered */
     padding: 20px;
     border: 1px solid #888;
-    width: 80%;
-    max-width: 400px;
+    width: 400px; /* Could be more or less, depending on screen size */
     text-align: center;
 }
 
-/* Game Wrapper */
-.gameWrapper {
-    position: relative;
+/*/// gameWrapper = gameboard + diceboard ///*/
+.gameWrapper{
+    position: absolute;
     top: 15%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
 }
 
 .gameBoard {
+    float: left;
+    align-content: center;
     position: relative;
-    margin: 0 auto;
+    right: 20px;
+    left: 250px;
 }
-
 .ludoImg {
-    width: 100%;
-    max-width: 800px;
-    height: auto;
+    width: 800px;
+    height: 800px;
     position: absolute;
     top: 0;
     left: 0;
@@ -206,32 +225,32 @@ body {
 }
 
 .gameCanvas {
-    width: 100%;
-    max-width: 750px;
-    height: auto;
+    width: 750px;
+    height: 750px;
     position: absolute;
-    top: 3.125%; /* 25px / 800px */
-    left: 3.125%;
+    top: 25px;
+    left: 25px;
     border: 2px solid;
     z-index: 1;
 }
 
 .diceBoard {
     position: relative;
-    margin: 20px auto;
-    text-align: center;
+    top: 20px;
+    left: 1100px;
+    right: 0px;
 }
 
 .msgBoard {
-    width: 90%;
-    max-width: 400px;
+    float: top;
+    width: 400px;
     height: 675px;
     border-radius: 5px;
-    padding: 8px;
+    align-content: center;
+    padding: 8px 8px 8px 8px;
     box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
     overflow-y: auto;
     font-family: sans-serif;
-    margin: 20px auto;
 }
 
 .goButt {
@@ -249,7 +268,7 @@ body {
     box-shadow: 0 6px 8px 0 rgba(0,0,0,0.14), 0 17px 50px 0 rgba(0,0,0,0.09);
 }
 
-#randomButt:hover, #copy-btn:hover, #RESUME:hover, #WAIT:hover {
+#randomButt:hover, #copy-btn:hover, #RESUME:hover, #WAIT {
     border: 1px solid white;
     cursor: pointer;
     box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
@@ -260,101 +279,16 @@ body {
 }
 
 .messageFromServer {
-    margin: 0 20px;
+    position: relative;
+    left: 20px;
+    margin-right: 40px;
     text-align: center;
 }
 
-#color-message-span1, #theOneWhoLeft {
+#color-message-span1,#theOneWhoLeft{
     font-family: 'ZCOOL KuaiLe', cursive;
 }
 
-#color-message-span2 {
+#color-message-span2{
     font-family: 'Roboto Slab', serif;
-}
-
-/* Mobile Responsiveness */
-@media only screen and (max-width: 768px) {
-    .navBar {
-        flex-direction: column;
-        padding: 10px;
-    }
-
-    .navBar a {
-        font-size: 14px;
-        padding: 10px;
-    }
-
-    #my-name {
-        font-size: 14px;
-        padding: 10px;
-    }
-
-    .copy-wrapper .copy-content {
-        right: 5px;
-        top: 70px;
-        width: 90%;
-        max-width: 250px;
-    }
-
-    .copy-content #copy {
-        font-size: 12px;
-    }
-
-    .tooltip .tooltiptext {
-        width: 120px;
-        font-size: 10px;
-        margin-left: -60px;
-    }
-
-    .heading-tile {
-        top: 5%;
-        left: 50%;
-        transform: translateX(-50%);
-    }
-
-    .heading-tile h2 {
-        font-size: 18px;
-        padding: 5px 10px;
-    }
-
-    .modal-content {
-        width: 90%;
-        max-width: 300px;
-        padding: 15px;
-    }
-
-    .gameWrapper {
-        top: 10%;
-    }
-
-    .gameBoard {
-        width: 100%;
-        max-width: 500px;
-    }
-
-    .ludoImg {
-        max-width: 500px;
-    }
-
-    .gameCanvas {
-        max-width: 468.75px; /* 500px * (750/800) */
-        top: 3.125%;
-        left: 3.125%;
-    }
-
-    .diceBoard {
-        margin: 10px auto;
-    }
-
-    .msgBoard {
-        width: 90%;
-        max-width: 350px;
-        height: 300px;
-        margin: 10px auto;
-    }
-
-    #randomButt, #copy-btn, #RESUME, #WAIT {
-        font-size: 16px;
-        padding: 2px 15px;
-    }
 }

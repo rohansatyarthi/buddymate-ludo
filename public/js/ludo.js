@@ -148,7 +148,7 @@ class Piece {
     if (this.pos !== -1 && this.pos + num <= 56) {
       for (let i = this.pos; i < this.pos + num; i++) {
         this.path[i](this.color_id, this.Pid);
-        console.log('hemilo selmon');
+        console.log('Moved piece:', this.color_id, this.Pid, this.x, this.y);
       }
       this.pos += num;
       if (this.pos === 56) {
@@ -163,46 +163,46 @@ class Piece {
 
   oneStepToRight(id, pid) {
     window.PLAYERS[id].myPieces[pid].x += 50;
-    console.log('to r', this.x, this.y, typeof(this.x), typeof(this.y));
+    console.log('to r', this.x, this.y);
   }
 
   oneStepToLeft(id, pid) {
     window.PLAYERS[id].myPieces[pid].x -= 50;
-    console.log('to l', this.x, this.y, typeof(this.x), typeof(this.y));
+    console.log('to l', this.x, this.y);
   }
 
   oneStepToTop(id, pid) {
     window.PLAYERS[id].myPieces[pid].y -= 50;
-    console.log('to t', this.x, this.y, typeof(this.x), typeof(this.y));
+    console.log('to t', this.x, this.y);
   }
 
   oneStepToBottom(id, pid) {
     window.PLAYERS[id].myPieces[pid].y += 50;
-    console.log('to b', this.x, this.y, typeof(this.x), typeof(this.y));
+    console.log('to b', this.x, this.y);
   }
 
   oneStepTowards45(id, pid) {
     window.PLAYERS[id].myPieces[pid].x += 50;
     window.PLAYERS[id].myPieces[pid].y -= 50;
-    console.log('to 45', this.x, this.y, typeof(this.x), typeof(this.y));
+    console.log('to 45', this.x, this.y);
   }
 
   oneStepTowards135(id, pid) {
     window.PLAYERS[id].myPieces[pid].x -= 50;
     window.PLAYERS[id].myPieces[pid].y -= 50;
-    console.log('to 135', this.x, this.y, typeof(this.x), typeof(this.y));
+    console.log('to 135', this.x, this.y);
   }
 
   oneStepTowards225(id, pid) {
     window.PLAYERS[id].myPieces[pid].x -= 50;
     window.PLAYERS[id].myPieces[pid].y += 50;
-    console.log('to 225', this.x, this.y, typeof(this.x), typeof(this.y));
+    console.log('to 225', this.x, this.y);
   }
 
   oneStepTowards315(id, pid) {
     window.PLAYERS[id].myPieces[pid].x += 50;
     window.PLAYERS[id].myPieces[pid].y += 50;
-    console.log('to 315', this.x, this.y, typeof(this.x), typeof(this.y));
+    console.log('to 315', this.x, this.y);
   }
 
   kill() {
@@ -219,18 +219,48 @@ socket.on('connect', function() {
     MYROOM = data.sort((a, b) => a - b);
     for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i]; }
     myid = id;
-    console.log('19/6/21 fetched:', MYROOM, myid, chance);
-    StartTheGame();
+    // Sync state with server
+    const localPositions = JSON.parse(window.localStorage.getItem('positions') || '{}');
+    const localChance = Number(window.localStorage.getItem('chance') || -1);
+    const localWin = JSON.parse(window.localStorage.getItem('win') || '{}');
+    socket.emit('sync-state', {
+      room: room_code,
+      positions: localPositions,
+      chance: localChance,
+      win: localWin
+    }, function(serverState) {
+      console.log('Server state received:', serverState);
+      StartTheGame(serverState);
+    });
   });
 
   if (chance === myid) {
     document.getElementById('randomButt').addEventListener('click', function(event) {
       event.preventDefault();
-      console.log('19/6/21 randomButt clicked');
+      console.log('randomButt clicked');
       styleButton(0);
       diceAction();
     });
   }
+});
+
+socket.on('state-updated', function(serverState) {
+  console.log('State updated from server:', serverState);
+  chance = Number(serverState.chance);
+  window.localStorage.setItem('chance', chance.toString());
+  window.localStorage.setItem('positions', JSON.stringify(serverState.positions));
+  window.localStorage.setItem('win', JSON.stringify(serverState.win));
+  for (let id in serverState.positions) {
+    if (PLAYERS[id]) {
+      for (let pid in serverState.positions[id]) {
+        PLAYERS[id].myPieces[pid].x = Number(serverState.positions[id][pid].x);
+        PLAYERS[id].myPieces[pid].y = Number(serverState.positions[id][pid].y);
+        PLAYERS[id].myPieces[pid].pos = Number(serverState.positions[id][pid].pos);
+      }
+      PLAYERS[id].won = Number(serverState.win[id] || 0);
+    }
+  }
+  allPlayerHandler();
 });
 
 socket.on('imposter', () => { window.location.replace('/error-imposter'); });
@@ -294,7 +324,7 @@ socket.on('Thrown-dice', async function(data) {
   }
   if (PLAYERS[data.id].didIwin()) {
     socket.emit('WON', {
-      room: data.room,
+      room: room_code,
       id: data.id,
       player: myid
     });
@@ -362,7 +392,7 @@ function styleButton(k) {
 
 function diceAction() {
   socket.emit('roll-dice', { room: room_code, id: myid }, function(num) {
-    console.log('19/6/21 dice rolled, got', num);
+    console.log('Dice rolled, got', num);
     let spirit = [];
     for (let i = 0; i < 4; i++) {
       if (PLAYERS[myid].myPieces[i].pos > -1 && PLAYERS[myid].myPieces[i].pos + num <= 56) {
@@ -372,7 +402,7 @@ function diceAction() {
     if (spirit.length !== 0 || num === 6) {
       outputMessage('Click on a piece', 3);
       canvas.addEventListener('click', function clickHandler(e) {
-        console.log('19/6/21 click event listener added to canvas element');
+        console.log('Click event listener added to canvas');
         let Xp = e.clientX - e.target.getBoundingClientRect().left;
         let Yp = e.clientY - e.target.getBoundingClientRect().top;
         let playerObj = {
@@ -389,13 +419,13 @@ function diceAction() {
             Yp - PLAYERS[myid].myPieces[i].y < 45 &&
             Yp - PLAYERS[myid].myPieces[i].y > 0
           ) {
-            console.log(i, 'okokokok');
+            console.log(`Clicked piece ${i}`);
             if ((spirit.includes(i) || num === 6) && PLAYERS[myid].myPieces[i].pos + num <= 56) {
               playerObj.pid = i;
               socket.emit('random', playerObj, function(data) {
                 styleButton(0);
                 console.log('random acknowledged');
-                socket.emit('chance', { room: room_code, nxt_id: chanceRotation(myid, data) });
+                socket.emit('chance', { room: room_code, nxt_id: chanceRotation(myid, num) });
               });
               canvas.removeEventListener('click', clickHandler);
               return 0;
@@ -410,12 +440,12 @@ function diceAction() {
       });
     } else {
       socket.emit('chance', { room: room_code, nxt_id: chanceRotation(myid, num) });
-      console.log('19/6/21 next chance');
+      console.log('Next chance');
     }
   });
 }
 
-function StartTheGame() {
+function StartTheGame(serverState) {
   MYROOM.forEach((numb) => {
     numb === myid
       ? outputMessage({ Name: 'You', id: numb }, 0)
@@ -428,13 +458,12 @@ function StartTheGame() {
   if (MYROOM.length === 1) {
     styleButton(1);
     chance = Number(myid);
-  } else {
-    styleButton(0);
+    window.localStorage.setItem('chance', chance.toString());
   }
-  loadAllPieces();
+  loadAllPieces(serverState);
 }
 
-function loadAllPieces() {
+function loadAllPieces(serverState) {
   let cnt = 0;
   for (let i = 0; i < colors.length; i++) {
     let img = new Image();
@@ -445,31 +474,37 @@ function loadAllPieces() {
         for (let j = 0; j < MYROOM.length; j++) {
           PLAYERS[MYROOM[j]] = new Player(MYROOM[j]);
         }
-        if (window.localStorage.getItem('room') === room_code) {
-          console.log('19/6/21 yes my localStorage is for this room');
-          if (window.localStorage.getItem('started') === 'true') {
-            console.log('19/6/21 yes i from this room');
-            chance = Number(window.localStorage.getItem('chance'));
-            let positions = JSON.parse(window.localStorage.getItem('positions'));
-            let win = JSON.parse(window.localStorage.getItem('win'));
-            for (let i = 0; i < MYROOM.length; i++) {
-              PLAYERS[MYROOM[i]].won = Number(win[MYROOM[i]]);
+        if (window.localStorage.getItem('room') === room_code && window.localStorage.getItem('started') === 'true' && !serverState) {
+          console.log('Restoring from localStorage');
+          chance = Number(window.localStorage.getItem('chance'));
+          let positions = JSON.parse(window.localStorage.getItem('positions') || '{}');
+          let win = JSON.parse(window.localStorage.getItem('win') || '{}');
+          for (let i = 0; i < MYROOM.length; i++) {
+            if (positions[MYROOM[i]]) {
+              PLAYERS[MYROOM[i]].won = Number(win[MYROOM[i]] || 0);
               for (let j = 0; j < 4; j++) {
-                console.log('19/6/21 yes room==room_code && started==true:i,j:', i, j);
+                console.log(`Restoring ${MYROOM[i]}, piece ${j}: x=${positions[MYROOM[i]][j].x}, y=${positions[MYROOM[i]][j].y}, pos=${positions[MYROOM[i]][j].pos}`);
                 PLAYERS[MYROOM[i]].myPieces[j].x = Number(positions[MYROOM[i]][j].x);
                 PLAYERS[MYROOM[i]].myPieces[j].y = Number(positions[MYROOM[i]][j].y);
                 PLAYERS[MYROOM[i]].myPieces[j].pos = Number(positions[MYROOM[i]][j].pos);
               }
             }
-            allPlayerHandler();
-          } else {
-            allPlayerHandler();
           }
-        } else {
-          window.localStorage.clear();
-          window.localStorage.setItem('room', room_code);
-          allPlayerHandler();
+        } else if (serverState) {
+          console.log('Restoring from server state:', serverState);
+          chance = Number(serverState.chance);
+          for (let id in serverState.positions) {
+            if (PLAYERS[id]) {
+              for (let pid in serverState.positions[id]) {
+                PLAYERS[id].myPieces[pid].x = Number(serverState.positions[id][pid].x);
+                PLAYERS[id].myPieces[pid].y = Number(serverState.positions[id][pid].y);
+                PLAYERS[id].myPieces[pid].pos = Number(serverState.positions[id][pid].pos);
+              }
+              PLAYERS[id].won = Number(serverState.win[id] || 0);
+            }
+          }
         }
+        allPlayerHandler();
       }
     };
     PIECES.push(img);
@@ -478,15 +513,15 @@ function loadAllPieces() {
 
 function chanceRotation(id, num) {
   if (num === 6) {
-    console.log('19/6/21 nxt 0 chance(num==6)', id);
+    console.log('Next chance (num==6):', id);
     return id;
   } else {
     let c = MYROOM[chance + 1];
     if (c) {
-      console.log('19/6/21 nxt 1 chance(MYROOM[chance+1])', c, '\nMYROOM', MYROOM, '\nPrevious chance', chance);
+      console.log('Next chance (MYROOM[chance+1]):', c, 'MYROOM:', MYROOM, 'Previous chance:', chance);
       return c;
     } else {
-      console.log('19/6/21 nxt 2 chance(MYROOM[0])', MYROOM[0], '\nMYROOM', MYROOM, '\nPrevious chance', chance);
+      console.log('Next chance (MYROOM[0]):', MYROOM[0], 'MYROOM:', MYROOM, 'Previous chance:', chance);
       return MYROOM[0];
     }
   }
@@ -514,29 +549,49 @@ function allPlayerHandler() {
   window.localStorage.setItem('chance', chance.toString());
   window.localStorage.setItem('positions', JSON.stringify(positions));
   window.localStorage.setItem('win', JSON.stringify(win));
+  socket.emit('sync-state', {
+    room: room_code,
+    positions,
+    chance,
+    win
+  }, function(serverState) {
+    console.log('State synced to server:', serverState);
+  });
 }
 
 function loadNewPiece(id) {
   PLAYERS[id] = new Player(id);
-  if (window.localStorage.getItem('room') === room_code) {
-    console.log('19/6/21 yes I\'m from our room');
-    if (window.localStorage.getItem('started')) {
-      console.log('19/6/21 yes i have already started the game');
-      let positions = JSON.parse(window.localStorage.getItem('positions'));
-      let win = JSON.parse(window.localStorage.getItem('win'));
-      if (positions[id]) {
-        console.log(`yes I have some data for user of id: ${id} in my local storage\nIt is ${JSON.stringify(positions[id])}`);
-        PLAYERS[id].won = Number(win[id]);
-        for (let j = 0; j < 4; j++) {
-          console.log(`19/6/21 for ${id},${j}\nx:${positions[id][j].x}\ny:${positions[id][j].y}\npos:${positions[id][j].pos}`);
-          PLAYERS[id].myPieces[j].x = Number(positions[id][j].x);
-          PLAYERS[id].myPieces[j].y = Number(positions[id][j].y);
-          PLAYERS[id].myPieces[j].pos = Number(positions[id][j].pos);
-        }
+  if (window.localStorage.getItem('room') === room_code && window.localStorage.getItem('started')) {
+    console.log('Restoring new player from localStorage');
+    let positions = JSON.parse(window.localStorage.getItem('positions') || '{}');
+    let win = JSON.parse(window.localStorage.getItem('win') || '{}');
+    if (positions[id]) {
+      console.log(`Restoring player ${id}: ${JSON.stringify(positions[id])}`);
+      PLAYERS[id].won = Number(win[id] || 0);
+      for (let j = 0; j < 4; j++) {
+        console.log(`Restoring ${id}, piece ${j}: x=${positions[id][j].x}, y=${positions[id][j].y}, pos=${positions[id][j].pos}`);
+        PLAYERS[id].myPieces[j].x = Number(positions[id][j].x);
+        PLAYERS[id].myPieces[j].y = Number(positions[id][j].y);
+        PLAYERS[id].myPieces[j].pos = Number(positions[id][j].pos);
       }
     }
   }
-  allPlayerHandler();
+  socket.emit('sync-state', {
+    room: room_code,
+    positions: { [id]: PLAYERS[id].myPieces },
+    win: { [id]: PLAYERS[id].won }
+  }, function(serverState) {
+    console.log('New player state synced:', serverState);
+    if (serverState.positions[id]) {
+      for (let pid in serverState.positions[id]) {
+        PLAYERS[id].myPieces[pid].x = Number(serverState.positions[id][pid].x);
+        PLAYERS[id].myPieces[pid].y = Number(serverState.positions[id][pid].y);
+        PLAYERS[id].myPieces[pid].pos = Number(serverState.positions[id][pid].pos);
+      }
+      PLAYERS[id].won = Number(serverState.win[id] || 0);
+    }
+    allPlayerHandler();
+  });
 }
 
 function iKill(id, pid) {

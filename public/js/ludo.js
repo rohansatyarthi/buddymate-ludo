@@ -212,14 +212,15 @@ socket.on('connect', function() {
     for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i] }
     myid = id;
     console.log('Fetched room:', MYROOM, myid, chance);
-    if (data.length === 0 && window.Android) {
+    const isCreatingRoom = data.length === 0 && window.location.href.endsWith(room_code);
+    if (isCreatingRoom && window.Android) {
         window.Android.sendRoomCode(room_code);
     }
     if (myid >= 0 && myid < USERNAMES.length) {
         document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
         StartTheGame();
-        console.log('Sending room code to Android:', room_code);
-        if (window.Android && data.length === 0) {
+        if (isCreatingRoom && window.Android) {
+            console.log('Sending room code to Android:', room_code);
             window.Android.sendRoomCode(room_code);
         }
     } else {

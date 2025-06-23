@@ -218,6 +218,10 @@ socket.on('connect', function() {
     if (myid >= 0 && myid < USERNAMES.length) {
         document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
         StartTheGame();
+        console.log('Sending room code to Android:', room_code);
+        if (window.Android && data.length === 0) {
+            window.Android.sendRoomCode(room_code);
+        }
     } else {
         console.error('Invalid myid:', myid);
         outputMessage({ msg: 'Error: Unable to assign player color' }, 5);
@@ -443,33 +447,35 @@ function loadAllPieces() {
             console.error('myid not in MYROOM:', myid, MYROOM);
         }
     }
-                if (window.localStorage.getItem('room') === room_code) {
-                    console.log('Yes my localStorage is for this room');
-                    if (window.localStorage.getItem('started') === 'true') {
-                        console.log('Yes I am from this room');
-                        chance = parseInt(window.localStorage.getItem('chance'));
-                        let positions = JSON.parse(window.localStorage.getItem('positions'));
-                        let win = JSON.parse(window.localStorage.getItem('win'));
-                        for (let i = 0; i < MYROOM.length; i++) {
-                            PLAYERS[MYROOM[i]].won = parseInt(win[i]);
-                            for (let j = 0; j < 4; j++) {
-                                console.log('Yes room==room_code && started==true:', i, j);
-                                PLAYERS[MYROOM[i]].myPieces[j].x = parseInt(positions[MYROOM[i]][j].x);
-                                PLAYERS[MYROOM[i]].myPieces[j].y = parseInt(positions[MYROOM[i]][j].y);
-                                PLAYERS[MYROOM[i]].myPieces[j].pos = parseInt(positions[MYROOM[i]][j].pos);
-                            }
-                        }
-                        allPlayerHandler();
-                    } else {
-                        allPlayerHandler();
+    // Moved localStorage handling outside
+    if (cnt >= colors.length) { // Ensure all images are loaded before handling localStorage
+        if (window.localStorage.getItem('room') === room_code) {
+            console.log('Yes my localStorage is for this room');
+            if (window.localStorage.getItem('started') === 'true') {
+                console.log('Yes I am from this room');
+                chance = parseInt(window.localStorage.getItem('chance'));
+                let positions = JSON.parse(window.localStorage.getItem('positions'));
+                let win = JSON.parse(window.localStorage.getItem('win'));
+                for (let i = 0; i < MYROOM.length; i++) {
+                    PLAYERS[MYROOM[i]].won = parseInt(win[i]);
+                    for (let j = 0; j < 4; j++) {
+                        console.log('Yes room==room_code && started==true:', i, j);
+                        PLAYERS[MYROOM[i]].myPieces[j].x = parseInt(positions[MYROOM[i]][j].x);
+                        PLAYERS[MYROOM[i]].myPieces[j].y = parseInt(positions[MYROOM[i]][j].y);
+                        PLAYERS[MYROOM[i]].myPieces[j].pos = parseInt(positions[MYROOM[i]][j].pos);
                     }
-                } else {
-                    window.localStorage.clear();
-                    window.localStorage.setItem('room', room_code);
-                    allPlayerHandler();
                 }
+                allPlayerHandler();
+            } else {
+                allPlayerHandler();
             }
+        } else {
+            window.localStorage.clear();
+            window.localStorage.setItem('room', room_code);
+            allPlayerHandler();
         }
+    }
+}
         PIECES.push(img);
     }
 }
@@ -492,8 +498,13 @@ function chanceRotation(id, num) {
 
 function allPlayerHandler() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    for (let i = 0; i < Object.keys(PLAYERS).length; i++) {
-        PLAYERS[MYROOM[i]].draw();
+    console.log('Drawing pieces for MYROOM:', MYROOM, 'PLAYERS:', Object.keys(PLAYERS));
+    for (let i = 0; i < MYROOM.length; i++) {
+        if (PLAYERS[MYROOM[i]]) {
+            PLAYERS[MYROOM[i]].draw();
+        } else {
+            console.error('No player found for ID:', MYROOM[i]);
+        }
     }
     let positions = {}
     let win = {}

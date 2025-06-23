@@ -1,6 +1,6 @@
 let socket = io(window.location.href.substring(0, window.location.href.length - 7));
 
-const room_code = window.location.href.split('/ludo/').pop()?.substring(0, 6) || generateNewRoomCode();
+const room_code = window.location.href.split('/ludo/').pop()?.substring(0, 6)?.toUpperCase() || generateNewRoomCode();
 const USERNAMES = ['Green Warrior', 'Red Fire', 'Blue Fox', 'Yellow Rhino'];
 const PIECES = [];
 const colors = ["green", "red", "blue", "yellow"];
@@ -205,52 +205,62 @@ class Piece {
 }
 
 socket.on('connect', function() {
-    console.log('You are connected to the server!!');
+    console.log('Connected to server');
 
-    socket.emit('fetch', room_code, function(data, id, error) {
-        if (error || data === null || id === null) {
-            console.error('Fetch error or invalid response:', error, data, id);
-            outputMessage({ msg: 'Error: Invalid or full room. Retrying...' }, 5);
-            const newRoomCode = generateNewRoomCode();
+    let fetchRetryCount = 0;
+    const maxFetchRetries = 5;
+    function tryFetch(roomCode) {
+        if (fetchRetryCount >= maxFetchRetries) {
+            console.error('Max fetch retries reached:', roomCode);
+            outputMessage({ msg: 'Error: Cannot create room. Try again.' }, 5);
+            const testRoom = 'TEST12';
+            console.log('Trying test room:', testRoom);
             if (window.Android) {
-                console.log('Sending new room code to Android:', newRoomCode);
-                window.Android.sendRoomCode(newRoomCode);
+                window.Android.sendRoomCode(testRoom);
             }
-            // Clear localStorage to reset room state
-            window.localStorage.clear();
-            // Delay retry to avoid server overload
             setTimeout(() => {
-                socket.emit('fetch', newRoomCode, function(newData, newId, newError) {
-                    if (newError || newData === null || newId === null) {
-                        console.error('Retry failed:', newError, newData, newId);
-                        outputMessage({ msg: 'Error: Unable to create room. Please try again.' }, 5);
-                        return;
-                    }
-                    window.location.href = `/ludo/${newRoomCode}`;
-                });
-            }, 1000); // 1s delay
+                window.location.href = `/ludo/${testRoom}`;
+            }, 2000);
             return;
         }
-        MYROOM = data ? data.sort((a, b) => a - b).map(Number) : [0];
-        myid = Number(id) >= 0 && Number(id) < USERNAMES.length ? Number(id) : 0;
-        console.log('Fetched room:', MYROOM, 'myid:', myid, 'chance:', chance);
-        const isCreatingRoom = !window.location.href.includes('/ludo/') || (data && data.length === 0);
-        if (isCreatingRoom && window.Android) {
-            console.log('Sending room code to Android (create):', room_code);
-            window.Android.sendRoomCode(room_code);
-        }
-        if (myid >= 0 && myid < USERNAMES.length) {
-            document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
-            if (isCreatingRoom && !MYROOM.includes(myid)) {
-                MYROOM.push(myid);
-                MYROOM.sort((a, b) => a - b);
+        fetchRetryCount++;
+        console.log('Fetch attempt', fetchRetryCount, 'for room:', roomCode);
+        socket.emit('fetch', roomCode, { timeout: 5000 }, function(data, id, error) {
+            if (error || data === null || id === null) {
+                console.error('Fetch error:', { error, data, id, room: roomCode });
+                outputMessage({ msg: `Retry ${fetchRetryCount}/${maxFetchRetries}: Invalid room` }, 5);
+                window.localStorage.clear();
+                const newRoomCode = generateNewRoomCode();
+                if (window.Android) {
+                    console.log('Sending room code to Android:', newRoomCode);
+                    window.Android.sendRoomCode(newRoomCode);
+                }
+                setTimeout(() => tryFetch(newRoomCode), 2000);
+                return;
             }
-            StartTheGame();
-        } else {
-            console.error('Invalid myid after fallback:', myid);
-            outputMessage({ msg: 'Error: Unable to assign player color' }, 5);
-        }
-    });
+            fetchRetryCount = 0;
+            MYROOM = data ? data.sort((a, b) => a - b).map(Number) : [0];
+            myid = Number(id) >= 0 && Number(id) < USERNAMES.length ? Number(id) : 0;
+            console.log('Room fetched:', { MYROOM, myid, chance });
+            const isCreatingRoom = !window.location.href.includes('/ludo/') || (data && data.length === 0);
+            if (isCreatingRoom && window.Android) {
+                console.log('Sending create room code:', roomCode);
+                window.Android.sendRoomCode(roomCode);
+            }
+            if (myid >= 0 && myid < USERNAMES.length) {
+                document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
+                if (isCreatingRoom && !MYROOM.includes(myid)) {
+                    MYROOM.push(myid);
+                    MYROOM.sort((a, b) => a - b);
+                }
+                StartTheGame();
+            } else {
+                console.error('Invalid myid:', myid);
+                outputMessage({ msg: 'Error: Cannot assign player' }, 5);
+            }
+        });
+    }
+    tryFetch(room_code);
 
     if (chance === myid) {
         document.getElementById('randomButt').addEventListener('click', function(event) {
@@ -262,26 +272,20 @@ socket.on('connect', function() {
     }
 
     socket.on('imposter', () => {
-        console.warn('Imposter detected, retrying with new room');
-        outputMessage({ msg: 'Room invalid or full. Retrying...' }, 5);
+        console.warn('Imposter detected for room:', room_code);
+        outputMessage({ msg: 'Room invalid. Retrying...' }, 5);
+        window.localStorage.clear();
         const newRoomCode = generateNewRoomCode();
         if (window.Android) {
-            console.log('Sending new room code to Android (imposter):', newRoomCode);
+            console.log('Sending imposter room code:', newRoomCode);
             window.Android.sendRoomCode(newRoomCode);
         }
-        // Clear localStorage to reset room state
-        window.localStorage.clear();
-        // Delay retry
-        setTimeout(() => {
-            socket.emit('fetch', newRoomCode, function(data, id, error) {
-                if (error || data === null || id === null) {
-                    console.error('Imposter retry failed:', error, data, id);
-                    outputMessage({ msg: 'Error: Unable to create room. Please try again.' }, 5);
-                    return;
-                }
-                window.location.href = `/ludo/${newRoomCode}`;
-            });
-        }, 1000);
+        setTimeout(() => tryFetch(newRoomCode), 2000);
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error('Socket connect error:', err.message);
+        outputMessage({ msg: 'Connection error: ' + err.message }, 5);
     });
 
     socket.on('is-it-your-chance', function(data) {
@@ -352,7 +356,7 @@ socket.on('connect', function() {
 });
 
 socket.on('disconnect', function() {
-    console.log('You are disconnected to the server');
+    console.log('Disconnected from server');
 });
 
 function outputMessage(anObject, k) {
@@ -580,9 +584,8 @@ function loadNewPiece(id) {
             if (positions[id]) {
                 console.log(`Yes I have data for user of ID: ${id} in my local storage\nIt is ${positions[id]}`);
                 PLAYERS[id].won = parseInt(win[id]);
-                for (let j = id0; j++) { positions[id]; }
                 for (let i = 0; i < 4; i++) {
-                    console.log(`for ${id}, ${j}\n${i}\nx${id}: ${parseInt(positions[id][i].x)}\n${id}: ${parseInt(positions[id][i].y)}, ${parseInt(id)}\npos${i}: ${parseInt(id)}`);
+                    console.log(`for ${id}, ${i}\nx: ${parseInt(positions[id][i].x)}\ny: ${parseInt(positions[id][i].y)}\npos: ${parseInt(positions[id][i].pos)}`);
                     PLAYERS[id].myPieces[i].x = parseInt(positions[id][i].x);
                     PLAYERS[id].myPieces[i].y = parseInt(positions[id][i].y);
                     PLAYERS[id].myPieces[i].pos = parseInt(positions[id][i].pos);
@@ -597,10 +600,10 @@ function iKill(id, pid) {
     let boss = PLAYERS[id].myPieces[pid];
     for (let i = 0; i < MYROOM.length; i++) {
         for (let j = 0; j < 4; j++) {
-            if (MYROOM[i] !== id && boss.x === PLAYERS[id].myPieces[j].x && boss.y === PLAYERS[id].myPieces[j].y) {
+            if (MYROOM[i] !== id && boss.x === PLAYERS[MYROOM[i]].myPieces[j].x && boss.y === PLAYERS[MYROOM[i]].myPieces[j].y) {
                 if (!inAhomeTile(id, pid)) {
-                    PLAYERS[id].myPieces[j].kill();
-                    return 0;
+                    PLAYERS[MYROOM[i]].myPieces[j].kill();
+                    return 1;
                 }
             }
         }
@@ -694,6 +697,6 @@ function resumeHandler(id) {
 }
 
 function generateNewRoomCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     return Array(6).fill().map(() => chars[Math.floor(Math.random() * chars.length)]).join('');
 }

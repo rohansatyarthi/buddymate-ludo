@@ -208,16 +208,21 @@ socket.on('connect', function() {
     console.log('You are connected to the server!!');
 
     socket.emit('fetch', room_code, function(data, id) {
-        MYROOM = data.sort(function(a, b) { return a - b });
-        for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i] }
-        myid = id;
-        console.log('Fetched room:', MYROOM, myid, chance);
-        // Send room code only when creating a new room (first player)
-        if (data.length === 0 && window.Android) {
-            window.Android.sendRoomCode(room_code);
-        }
+    MYROOM = data.sort(function(a, b) { return a - b });
+    for (let i = 0; i < MYROOM.length; i++) { MYROOM[i] = +MYROOM[i] }
+    myid = id;
+    console.log('Fetched room:', MYROOM, myid, chance);
+    if (data.length === 0 && window.Android) {
+        window.Android.sendRoomCode(room_code);
+    }
+    if (myid >= 0 && myid < USERNAMES.length) {
+        document.getElementById('my-name').innerHTML = `You are ${USERNAMES[myid]}`;
         StartTheGame();
-    });
+    } else {
+        console.error('Invalid myid:', myid);
+        outputMessage({ msg: 'Error: Unable to assign player color' }, 5);
+    }
+});
 
     if (chance === myid) {
         document.getElementById('randomButt').addEventListener('click', function(event) {
@@ -426,11 +431,18 @@ function loadAllPieces() {
         let img = new Image();
         img.src = "/images/pieces/" + colors[i].toLowerCase() + ".png";
         img.onload = () => {
-            ++cnt;
-            if (cnt >= colors.length) {
-                for (let j = 0; j < MYROOM.length; j++) {
-                    PLAYERS[MYROOM[j]] = new Player(MYROOM[j]);
-                }
+    ++cnt;
+    if (cnt >= colors.length) {
+        for (let j = 0; j < MYROOM.length; j++) {
+            PLAYERS[MYROOM[j]] = new Player(MYROOM[j]);
+        }
+        if (MYROOM.includes(myid)) {
+            allPlayerHandler();
+            outputMessage({ Name: 'You', id: myid }, 0);
+        } else {
+            console.error('myid not in MYROOM:', myid, MYROOM);
+        }
+    }
                 if (window.localStorage.getItem('room') === room_code) {
                     console.log('Yes my localStorage is for this room');
                     if (window.localStorage.getItem('started') === 'true') {

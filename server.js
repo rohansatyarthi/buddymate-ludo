@@ -58,7 +58,7 @@ app.get('/', (req, res) => {
 
 app.post('/', (req, res) => {
   const action = req.body.action_to_do;
-  let roomCode = req.body.roomcode?.toUpperCase();
+  let roomCode = req.body.roomcode?.toUpperCase() || '';
 
   if (action === 'create') {
     roomCode = generateRoomCode();
@@ -78,7 +78,7 @@ app.post('/', (req, res) => {
     rooms.get(roomCode).gameState.positions[playerId] = {};
     rooms.get(roomCode).gameState.win[playerId] = 0;
     console.log(`Created room ${roomCode} with player ID ${playerId}, session ${req.sessionID}`);
-    res.redirect(`/${roomCode}`);
+    res.json({ roomCode }); // Return room code for native app
   } else if (action === 'join' && roomCode && rooms.has(roomCode)) {
     const room = rooms.get(roomCode);
     if (room.players.size < 4) {
@@ -93,11 +93,32 @@ app.post('/', (req, res) => {
       console.log(`Player ID ${playerId} joined room ${roomCode}, session ${req.sessionID}`);
       res.redirect(`/${roomCode}`);
     } else {
-      res.redirect('/error-imposter');
+      res.status(400).json({ error: 'Room is full' });
     }
   } else {
-    res.redirect('/error-imposter');
+    res.status(400).json({ error: 'Invalid room code' });
   }
+});
+
+app.get('/create-room', (req, res) => {
+  let roomCode = generateRoomCode();
+  while (rooms.has(roomCode)) {
+    roomCode = generateRoomCode();
+  }
+  rooms.set(roomCode, {
+    players: new Map(),
+    idCounter: 0,
+    gameState: { positions: {}, chance: -1, win: {} }
+  });
+  const playerId = 0;
+  req.session.roomCode = roomCode;
+  req.session.playerId = playerId;
+  req.session.sessionId = req.sessionID;
+  rooms.get(roomCode).players.set(req.sessionID, { id: playerId, socketId: null });
+  rooms.get(roomCode).gameState.positions[playerId] = {};
+  rooms.get(roomCode).gameState.win[playerId] = 0;
+  console.log(`Created room ${roomCode} with player ID ${playerId}, session ${req.sessionID}`);
+  res.json({ roomCode });
 });
 
 app.get('/:roomCode', (req, res) => {
@@ -122,7 +143,7 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   const session = socket.request.session;
-  const roomCode = session.roomCode;
+  const roomCode = session.roomCode?.toUpperCase();
   const playerId = session.playerId;
   const sessionId = session.sessionId;
 
@@ -138,7 +159,7 @@ io.on('connection', (socket) => {
   socket.join(roomCode);
 
   socket.on('fetch', (room, callback) => {
-    if (room === roomCode) {
+    if (room.toUpperCase() === roomCode) {
       const roomData = rooms.get(roomCode);
       const playerIds = Array.from(roomData.players.values()).map(p => p.id).sort((a, b) => a - b);
       console.log(`Fetch for room ${roomCode}: ${playerIds}, returning myid: ${playerId}`);
@@ -147,7 +168,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('sync-state', ({ room, positions, chance, win }, callback) => {
-    if (room === roomCode) {
+    if (room.toUpperCase() === roomCode) {
       const roomData = rooms.get(roomCode);
       console.log(`Client sent state for ${room}: positions=${JSON.stringify(positions)}, chance=${chance}, win=${JSON.stringify(win)}`);
       if (positions) {
@@ -157,9 +178,7 @@ io.on('connection', (socket) => {
           }
           for (let pid in positions[id]) {
             roomData.gameState.positions[id][pid] = {
-              x: Number(positions[id][pid].x),
-              y: Number(positions[id][pid].y),
-              pos: Number(positions[id][pid].pos)
+              pos: Number(positions[id][pid].pos || 0) // Only use pos for native app
             };
           }
         }
@@ -179,7 +198,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('roll-dice', ({ room, id }, callback) => {
-    if (room === roomCode && id === playerId) {
+    if (room.toUpperCase() === roomCode && id === playerId) {
       const num = Math.floor(Math.random() * 6) + 1;
       io.to(roomCode).emit('rolled-dice', { id, num });
       console.log(`Player ${playerId} in room ${roomCode} rolled ${num}`);
@@ -188,7 +207,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('random', ({ room, id, pid, num }, callback) => {
-    if (room === roomCode && id === playerId) {
+    if (room.toUpperCase() === roomCode && id === playerId) {
       io.to(roomCode).emit('Thrown-dice', { id, pid, num, room });
       console.log(`Player ${playerId} moved piece ${pid} by ${num} in room ${roomCode}`);
       callback(true);
@@ -196,7 +215,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('chance', ({ room, nxt_id }) => {
-    if (room === roomCode) {
+    if (room.toUpperCase() === roomCode) {
       rooms.get(roomCode).gameState.chance = Number(nxt_id);
       io.to(roomCode).emit('is-it-your-chance', nxt_id);
       console.log(`Chance passed to player ${nxt_id} in room ${roomCode}`);
@@ -204,7 +223,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('WON', ({ room, id, player }) => {
-    if (room === roomCode && id === playerId) {
+    if (room.toUpperCase() === roomCode && id === playerId) {
       rooms.get(roomCode).gameState.win[id] = (rooms.get(roomCode).gameState.win[id] || 0) + 1;
       io.to(roomCode).emit('winner', id);
       console.log(`Player ${playerId} won in room ${roomCode}`);
@@ -212,7 +231,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('resume', ({ room, id, click }, callback) => {
-    if (room === roomCode && click === playerId) {
+    if (room.toUpperCase() === roomCode && click === playerId) {
       io.to(roomCode).emit('resume', { id, click });
       console.log(`Player ${click} resumed game without ${id} in room ${roomCode}`);
       callback();
@@ -220,11 +239,34 @@ io.on('connection', (socket) => {
   });
 
   socket.on('wait', ({ room, click }, callback) => {
-    if (room === roomCode && click === playerId) {
+    if (room.toUpperCase() === roomCode && click === playerId) {
       io.to(roomCode).emit('wait', { click });
       console.log(`Player ${click} chose to wait in room ${roomCode}`);
       callback();
     }
+  });
+
+  socket.on('create-room', (callback) => {
+    let roomCode = generateRoomCode();
+    while (rooms.has(roomCode)) {
+      roomCode = generateRoomCode();
+    }
+    rooms.set(roomCode, {
+      players: new Map(),
+      idCounter: 0,
+      gameState: { positions: {}, chance: -1, win: {} }
+    });
+    const playerId = 0;
+    rooms.get(roomCode).players.set(sessionId, { id: playerId, socketId: socket.id });
+    rooms.get(roomCode).gameState.positions[playerId] = {};
+    rooms.get(roomCode).gameState.win[playerId] = 0;
+    session.roomCode = roomCode;
+    session.playerId = playerId;
+    session.sessionId = sessionId;
+    session.save();
+    socket.join(roomCode);
+    console.log(`Created room ${roomCode} with player ID ${playerId}, session ${sessionId} via socket`);
+    callback(roomCode);
   });
 
   socket.on('disconnect', () => {

@@ -41,6 +41,15 @@ app.use(express.static(publicPath));
 
 const rooms = new Map();
 
+function initializePlayerPositions() {
+  return {
+    "0": { pos: 0 },
+    "1": { pos: 0 },
+    "2": { pos: 0 },
+    "3": { pos: 0 }
+  };
+}
+
 function generateRoomCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
@@ -68,17 +77,21 @@ app.post('/', (req, res) => {
     rooms.set(roomCode, {
       players: new Map(),
       idCounter: 0,
-      gameState: { positions: {}, chance: -1, win: {} }
+      gameState: {
+        positions: {},
+        chance: 0,
+        win: {}
+      }
     });
     const playerId = 0;
     req.session.roomCode = roomCode;
     req.session.playerId = playerId;
     req.session.sessionId = req.sessionID;
     rooms.get(roomCode).players.set(req.sessionID, { id: playerId, socketId: null });
-    rooms.get(roomCode).gameState.positions[playerId] = {};
-    rooms.get(roomCode).gameState.win[playerId] = 0;
+    rooms.get(roomCode).gameState.positions["0"] = initializePlayerPositions();
+    rooms.get(roomCode).gameState.win["0"] = 0;
     console.log(`Created room ${roomCode} with player ID ${playerId}, session ${req.sessionID}`);
-    res.json({ roomCode }); // Return room code for native app
+    res.json({ roomCode });
   } else if (action === 'join' && roomCode && rooms.has(roomCode)) {
     const room = rooms.get(roomCode);
     if (room.players.size < 4) {
@@ -88,9 +101,9 @@ app.post('/', (req, res) => {
       req.session.roomCode = roomCode;
       req.session.playerId = playerId;
       req.session.sessionId = req.sessionID;
-      rooms.get(roomCode).gameState.positions[playerId] = {};
-      rooms.get(roomCode).gameState.win[playerId] = 0;
-      console.log(`Player ID ${playerId} joined room ${roomCode}, session ${req.sessionID}`);
+      rooms.get(roomCode).gameState.positions[playerId.toString()] = initializePlayerPositions();
+      rooms.get(roomCode).gameState.win[playerId.toString()] = 0;
+      console.log(`Player ${playerId} joined room ${roomCode}, session ${req.sessionID}`);
       res.redirect(`/${roomCode}`);
     } else {
       res.status(400).json({ error: 'Room is full' });
@@ -108,15 +121,19 @@ app.get('/create-room', (req, res) => {
   rooms.set(roomCode, {
     players: new Map(),
     idCounter: 0,
-    gameState: { positions: {}, chance: -1, win: {} }
+    gameState: {
+      positions: {},
+      chance: 0,
+      win: {}
+    }
   });
   const playerId = 0;
   req.session.roomCode = roomCode;
   req.session.playerId = playerId;
   req.session.sessionId = req.sessionID;
   rooms.get(roomCode).players.set(req.sessionID, { id: playerId, socketId: null });
-  rooms.get(roomCode).gameState.positions[playerId] = {};
-  rooms.get(roomCode).gameState.win[playerId] = 0;
+  rooms.get(roomCode).gameState.positions["0"] = initializePlayerPositions();
+  rooms.get(roomCode).gameState.win["0"] = 0;
   console.log(`Created room ${roomCode} with player ID ${playerId}, session ${req.sessionID}`);
   res.json({ roomCode });
 });
@@ -141,7 +158,7 @@ io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next);
 });
 
-io.on('connection', (socket) => {
+io.on('connection', (socket) {
   const session = socket.request.session;
   const roomCode = session.roomCode?.toUpperCase();
   const playerId = session.playerId;
@@ -158,6 +175,30 @@ io.on('connection', (socket) => {
   rooms.get(roomCode).players.set(sessionId, { id: playerId, socketId: socket.id });
   socket.join(roomCode);
 
+  socket.on('join-room', (data, callback) {
+    const { room, id } = data;
+    if (room.toUpperCase() === roomCode && rooms.has(roomCode)) {
+      const roomData = rooms.get(roomCode);
+      if (roomData.players.size < 4 && !Array.from(roomData.players.values()).some(p => p.id === id)) {
+        roomData.players.set(sessionId, { id: id, socketId: socket.id });
+        roomData.idCounter = Math.max(roomData.idCounter, id);
+        rooms.get(roomCode).gameState.positions[id.toString()] = initializePlayerPositions();
+        rooms.get(roomCode).gameState.win[id.toString()] = 0;
+        socket.join(roomCode);
+        console.log(`Player ${id} joined room ${roomCode} via join-room, session ${sessionId}`);
+        io.to(roomCode).emit('player-joined', id);
+        callback({ success: true, players: Array.from(roomData.players.values()).map(p => p.id) });
+      } else {
+        callback({
+          success: false,
+          error: roomData.players.size >= 4 ? 'Room is full' : 'Player ID already exists'
+        });
+      }
+    } else {
+      callback({ success: false, error: 'Invalid room code' });
+    }
+  });
+
   socket.on('fetch', (room, callback) => {
     if (room.toUpperCase() === roomCode) {
       const roomData = rooms.get(roomCode);
@@ -170,15 +211,15 @@ io.on('connection', (socket) => {
   socket.on('sync-state', ({ room, positions, chance, win }, callback) => {
     if (room.toUpperCase() === roomCode) {
       const roomData = rooms.get(roomCode);
-      console.log(`Client sent state for ${room}: positions=${JSON.stringify(positions)}, chance=${chance}, win=${JSON.stringify(win)}`);
+      console.log(`Client sent state for ${room: ${positions=${JSON.stringify(positions)}, chance=${chance}, win=${JSON.stringify(win)})}`);
       if (positions) {
         for (let id in positions) {
           if (!roomData.gameState.positions[id]) {
             roomData.gameState.positions[id] = {};
           }
           for (let pid in positions[id]) {
-            roomData.gameState.positions[id][pid] = {
-              pos: Number(positions[id][pid].pos || 0) // Only use pos for native app
+            rooms.get(roomCode).gameState.positions[id][pid].pid = {
+              pos: Number(positions[id][pid].pos || 0)
             };
           }
         }
@@ -188,12 +229,12 @@ io.on('connection', (socket) => {
       }
       if (win) {
         for (let id in win) {
-          roomData.gameState.win[id] = Number(win[id]);
+          rooms.get(roomCode).win[id].id = Number(win[id].win);
         }
       }
-      console.log(`Updated state for room ${roomCode}: ${JSON.stringify(roomData.gameState)}`);
+      console.log('Updated state for room${roomCode}: ${JSON.stringify(roomData.gameState)}`);
       callback(roomData.gameState);
-      io.to(roomCode).emit('state-updated', roomData.gameState);
+      io.to(roomCode, roomData).emit('state-updated', roomData.gameState);
     }
   });
 
@@ -254,12 +295,16 @@ io.on('connection', (socket) => {
     rooms.set(roomCode, {
       players: new Map(),
       idCounter: 0,
-      gameState: { positions: {}, chance: -1, win: {} }
+      gameState: {
+        positions: {},
+        chance: 0,
+        win: {}
+      }
     });
     const playerId = 0;
     rooms.get(roomCode).players.set(sessionId, { id: playerId, socketId: socket.id });
-    rooms.get(roomCode).gameState.positions[playerId] = {};
-    rooms.get(roomCode).gameState.win[playerId] = 0;
+    rooms.get(roomCode).gameState.positions["0"] = initializePlayerPositions();
+    rooms.get(roomCode).gameState.win["0"] = 0;
     session.roomCode = roomCode;
     session.playerId = playerId;
     session.sessionId = sessionId;

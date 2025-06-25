@@ -158,7 +158,7 @@ io.use((socket, next) => {
   sessionMiddleware(socket.request, {}, next);
 });
 
-io.on('connection', (socket) {
+io.on('connection', (socket) => {
   const session = socket.request.session;
   const roomCode = session.roomCode?.toUpperCase();
   const playerId = session.playerId;
@@ -175,7 +175,7 @@ io.on('connection', (socket) {
   rooms.get(roomCode).players.set(sessionId, { id: playerId, socketId: socket.id });
   socket.join(roomCode);
 
-  socket.on('join-room', (data, callback) {
+  socket.on('join-room', (data, callback) => {
     const { room, id } = data;
     if (room.toUpperCase() === roomCode && rooms.has(roomCode)) {
       const roomData = rooms.get(roomCode);
@@ -211,14 +211,14 @@ io.on('connection', (socket) {
   socket.on('sync-state', ({ room, positions, chance, win }, callback) => {
     if (room.toUpperCase() === roomCode) {
       const roomData = rooms.get(roomCode);
-      console.log(`Client sent state for ${room: ${positions=${JSON.stringify(positions)}, chance=${chance}, win=${JSON.stringify(win)})}`);
+      console.log(`Client sent state for ${room}: positions=${JSON.stringify(positions)}, chance=${chance}, win=${JSON.stringify(win)}`);
       if (positions) {
         for (let id in positions) {
           if (!roomData.gameState.positions[id]) {
             roomData.gameState.positions[id] = {};
           }
           for (let pid in positions[id]) {
-            rooms.get(roomCode).gameState.positions[id][pid].pid = {
+            roomData.gameState.positions[id][pid] = {
               pos: Number(positions[id][pid].pos || 0)
             };
           }
@@ -229,12 +229,12 @@ io.on('connection', (socket) {
       }
       if (win) {
         for (let id in win) {
-          rooms.get(roomCode).win[id].id = Number(win[id].win);
+          roomData.gameState.win[id] = Number(win[id]);
         }
       }
-      console.log('Updated state for room${roomCode}: ${JSON.stringify(roomData.gameState)}`);
+      console.log(`Updated state for room ${roomCode}: ${JSON.stringify(roomData.gameState)}`);
       callback(roomData.gameState);
-      io.to(roomCode, roomData).emit('state-updated', roomData.gameState);
+      io.to(roomCode).emit('state-updated', roomData.gameState);
     }
   });
 

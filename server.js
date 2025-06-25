@@ -176,18 +176,34 @@ io.on('connection', (socket) => {
   socket.join(roomCode);
 
   socket.on('join-room', (data, callback) => {
-    const { room, id } = data;
+    const { room, id, action } = data;
     if (room.toUpperCase() === roomCode && rooms.has(roomCode)) {
       const roomData = rooms.get(roomCode);
       if (roomData.players.size < 4 && !Array.from(roomData.players.values()).some(p => p.id === id)) {
         roomData.players.set(sessionId, { id: id, socketId: socket.id });
         roomData.idCounter = Math.max(roomData.idCounter, id);
-        rooms.get(roomCode).gameState.positions[id.toString()] = initializePlayerPositions();
-        rooms.get(roomCode).gameState.win[id.toString()] = 0;
+        if (!roomData.gameState.positions[id.toString()]) {
+          roomData.gameState.positions[id.toString()] = {};
+          for (let i = 0; i < 4; i++) {
+            roomData.gameState.positions[id.toString()][i.toString()] = { x: 0, y: 0, pos: -1 }; // Placeholder
+          }
+        }
+        roomData.gameState.win[id.toString()] = 0;
         socket.join(roomCode);
-        console.log(`Player ${id} joined room ${roomCode} via join-room, session ${sessionId}`);
+        console.log(`Player ${id} ${action === 'create' ? 'created' : 'joined'} room ${roomCode}, session ${sessionId}`);
         io.to(roomCode).emit('player-joined', id);
         callback({ success: true, players: Array.from(roomData.players.values()).map(p => p.id) });
+
+        // Start game after first join or creation
+        if (roomData.players.size === 1 && action === 'create') {
+          roomData.gameState.chance = id;
+          io.to(roomCode).emit('state-updated', roomData.gameState);
+          console.log(`Game started in ${roomCode} with chance ${id}`);
+        } else if (roomData.players.size > 1) {
+          roomData.gameState.chance = roomData.players.values().next().value.id; // First player
+          io.to(roomCode).emit('state-updated', roomData.gameState);
+          console.log(`Game updated in ${roomCode} with chance ${roomData.gameState.chance}`);
+        }
       } else {
         callback({
           success: false,
@@ -211,7 +227,7 @@ io.on('connection', (socket) => {
   socket.on('sync-state', ({ room, positions, chance, win }, callback) => {
     if (room.toUpperCase() === roomCode) {
       const roomData = rooms.get(roomCode);
-      console.log(`Client sent state for ${room}: positions=${JSON.stringify(positions)}, chance=${chance}, win=${JSON.stringify(win)}`);
+      console.log(`Sync-state for ${room}: positions=${JSON.stringify(positions)}, chance=${chance}, win=${JSON.stringify(win)}`);
       if (positions) {
         for (let id in positions) {
           if (!roomData.gameState.positions[id]) {
@@ -219,6 +235,8 @@ io.on('connection', (socket) => {
           }
           for (let pid in positions[id]) {
             roomData.gameState.positions[id][pid] = {
+              x: Number(positions[id][pid].x || 0),
+              y: Number(positions[id][pid].y || 0),
               pos: Number(positions[id][pid].pos || 0)
             };
           }
@@ -232,12 +250,11 @@ io.on('connection', (socket) => {
           roomData.gameState.win[id] = Number(win[id]);
         }
       }
-      console.log(`Updated state for room ${roomCode}: ${JSON.stringify(roomData.gameState)}`);
+      console.log(`Updated state: ${JSON.stringify(roomData.gameState)}`);
       callback(roomData.gameState);
       io.to(roomCode).emit('state-updated', roomData.gameState);
     }
   });
-
   socket.on('roll-dice', ({ room, id }, callback) => {
     if (room.toUpperCase() === roomCode && id === playerId) {
       const num = Math.floor(Math.random() * 6) + 1;
